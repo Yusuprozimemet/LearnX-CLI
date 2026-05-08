@@ -2,7 +2,7 @@ import hashlib
 import logging
 from pathlib import Path
 
-from tutor.constants import PROMPT_VERSION, SUMMARY_CACHE_DIR
+from tutor.constants import MAX_SUMMARIZE_INPUT_TOKENS, PROMPT_VERSION, SUMMARY_CACHE_DIR
 from tutor.infra.llm import load_prompt
 from tutor.models import Chunk
 
@@ -33,12 +33,19 @@ def summarize_all(
             continue
 
         log.info("Summarizing chunk %s (%d tokens)", c.chunk_id, c.token_count)
+        chunk_text = _truncate_to_tokens(c.text, MAX_SUMMARIZE_INPUT_TOKENS)
         messages = [
             {"role": "system", "content": prompt_text},
-            {"role": "user", "content": c.text},
+            {"role": "user", "content": chunk_text},
         ]
         summary = llm_fn(messages, call_type="summarize")
         cache_file.write_text(summary, encoding="utf-8")
         c.summary = summary
 
     return chunks
+
+
+def _truncate_to_tokens(text: str, max_tokens: int) -> str:
+    max_words = int(max_tokens / 1.3)
+    words = text.split()
+    return " ".join(words[:max_words]) if len(words) > max_words else text

@@ -22,6 +22,15 @@ MODEL_MAP = {
     ("openrouter", "qa"): "meta-llama/llama-3.1-8b-instruct:free",
 }
 
+# Max *response* tokens per call type — keeps total request well under the
+# Groq free-tier 6 k-token-per-request cap (input + output combined).
+MAX_TOKENS_MAP = {
+    "curriculum": 2_000,
+    "dialogue":   1_500,
+    "summarize":  400,
+    "qa":         600,
+}
+
 
 def _build_client(provider: str, config: Config) -> OpenAI:
     if provider == "groq":
@@ -58,12 +67,15 @@ def chat(
     client = _build_client(provider, config)
     log.debug("LLM call provider=%s call_type=%s model=%s", provider, call_type, model)
 
+    max_tokens = MAX_TOKENS_MAP.get(call_type, 1_000)
+
     for attempt in range(2):
         try:
             response = client.chat.completions.create(
                 model=model,
                 messages=messages,
                 temperature=0.7,
+                max_tokens=max_tokens,
             )
             content = response.choices[0].message.content
             log.debug("LLM response (first 200 chars): %s", content[:200])
@@ -72,6 +84,10 @@ def chat(
             status = getattr(e, "status_code", None)
             if status in (400, 401, 403):
                 raise LLMError(f"Auth/request error ({status}): {e}") from e
+            if status == 413:
+                raise LLMError(
+                    f"Request too large for {model} — reduce source text or word budget. ({e})"
+                ) from e
             if attempt == 0:
                 log.warning("LLM call failed (%s), retrying in 2s...", e)
                 time.sleep(2)
