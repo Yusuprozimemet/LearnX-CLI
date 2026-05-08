@@ -65,6 +65,41 @@ def print_session_complete(unit_count: int, total_s: int, qa_count: int) -> None
     print("  [r] replay session   [q] quit\n")
 
 
+def print_qa_disabled() -> None:
+    print("\nQ&A disabled (--no-qa). Press [space] to resume.")
+
+
+def print_thinking() -> None:
+    print("\nThinking...", end="", flush=True)
+
+
+def print_no_context() -> None:
+    print("\n(No unit context available)")
+
+
+def print_resume_hint() -> None:
+    print("Press [space] to resume or [?] to ask another question.\n")
+
+
+def print_question_header(topic: str, position_fmt: str) -> None:
+    print(f"\n── Ask a question ──────────────────────────────────")
+    print(f"Topic: {topic}  |  Position: {position_fmt}")
+    print()
+
+
+def print_cancelled() -> None:
+    print(" (cancelled)")
+
+
+def print_answer(answer: str, unit_concept: str) -> None:
+    border = "─" * 56
+    print(f"\n{border}")
+    print(f"Answer:\n{answer}")
+    suffix = border[len(unit_concept) + 10:]
+    print(f"\n── Source: §{unit_concept} {suffix}")
+    print()
+
+
 def _progress_bar(elapsed_s: int, total_s: int) -> str:
     if total_s <= 0:
         return "[" + "░" * PLAYER_BAR_WIDTH + "]"

@@ -47,10 +47,15 @@ def generate(
         "memory_hook": unit.memory_hook,
     }, indent=2)
 
+    speaker_constraint = (
+        "IMPORTANT: Only use ALEX and SAM speakers. Do NOT use MAYA."
+        if fmt == "dual-tutor"
+        else "IMPORTANT: Only use ALEX and MAYA speakers. Do NOT use SAM."
+    )
     system_prompt = load_prompt("dialogue.txt").format(
         format=fmt,
         word_budget=unit.word_budget,
-    )
+    ) + f"\n\n{speaker_constraint}"
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -69,6 +74,9 @@ def generate(
             raise LLMError(
                 f"Dialogue generation returned fewer than 4 lines for unit {unit.unit}: {unit.concept}"
             )
+
+    lines = _normalize_speakers(lines, fmt)
+    _validate_speakers(lines, fmt)
 
     Path(cache_dir).mkdir(parents=True, exist_ok=True)
     cache_file.write_text(
@@ -97,6 +105,42 @@ def _parse_dialogue_line(raw_line: str, unit_number: int) -> DialogueLine | None
         text=match.group(2).strip(),
         unit_number=unit_number,
     )
+
+
+def _normalize_speakers(lines: list[DialogueLine], fmt: str) -> list[DialogueLine]:
+    """Remap speakers so the output matches the requested format."""
+    if fmt == "dual-tutor":
+        return [
+            DialogueLine(
+                speaker="SAM" if l.speaker == "MAYA" else l.speaker,
+                text=l.text,
+                unit_number=l.unit_number,
+            )
+            for l in lines
+        ]
+    return [
+        DialogueLine(
+            speaker="MAYA" if l.speaker == "SAM" else l.speaker,
+            text=l.text,
+            unit_number=l.unit_number,
+        )
+        for l in lines
+    ]
+
+
+def _validate_speakers(lines: list[DialogueLine], fmt: str) -> None:
+    speakers = {line.speaker for line in lines}
+    if fmt == "tutor-student":
+        if "ALEX" not in speakers:
+            raise LLMError("tutor-student dialogue missing ALEX lines")
+        if "SAM" in speakers:
+            raise LLMError("tutor-student dialogue contains SAM — wrong format")
+    elif fmt == "dual-tutor":
+        if "MAYA" in speakers:
+            raise LLMError("dual-tutor dialogue contains MAYA — wrong format")
+        expected = {"ALEX", "SAM"}
+        if not expected.issubset(speakers):
+            raise LLMError(f"dual-tutor dialogue missing speakers: {expected - speakers}")
 
 
 def _parse_dialogue(raw: str, unit_number: int) -> list[DialogueLine]:

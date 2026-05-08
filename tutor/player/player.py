@@ -158,7 +158,7 @@ class TutorPlayer:
 
     def _ask_question(self) -> None:
         if self.no_qa or self.llm_fn is None:
-            print("\nQ&A disabled (--no-qa). Press [space] to resume.")
+            player_display.print_qa_disabled()
             return
 
         if self._state == "PLAYING":
@@ -173,12 +173,12 @@ class TutorPlayer:
             return
 
         self._state = "ANSWERING"
-        print("\nThinking...", end="", flush=True)
+        player_display.print_thinking()
 
         from tutor.qa import qa
         current_unit = self.units[self._current_idx] if self._current_idx < len(self.units) else None
         if current_unit is None:
-            print("\n(No unit context available)")
+            player_display.print_no_context()
             self._state = "PAUSED"
             return
 
@@ -192,21 +192,18 @@ class TutorPlayer:
         )
         self.qa_count += 1
 
-        _print_answer(question, answer_text, current_unit)
+        player_display.print_answer(answer_text, current_unit.concept)
         self._state = "PAUSED"
-        print("Press [space] to resume or [?] to ask another question.\n")
+        player_display.print_resume_hint()
 
     def _prompt_for_question(self) -> str | None:
         unit = self.units[self._current_idx] if self._current_idx < len(self.units) else None
         topic = unit.concept if unit else "current topic"
-
-        print(f"\n── Ask a question ──────────────────────────────────")
-        print(f"Topic: {topic}  |  Position: {player_display._fmt_time(self._elapsed_seconds())}")
-        print()
+        player_display.print_question_header(topic, player_display._fmt_time(self._elapsed_seconds()))
         try:
             return input("Your question: ").strip() or None
         except (KeyboardInterrupt, EOFError):
-            print(" (cancelled)")
+            player_display.print_cancelled()
             return None
 
     def _redraw(self) -> None:
@@ -246,9 +243,3 @@ class TutorPlayer:
         )
 
 
-def _print_answer(question: str, answer: str, unit: TeachingUnit) -> None:
-    border = "─" * 56
-    print(f"\n{border}")
-    print(f"Answer:\n{answer}")
-    print(f"\n── Source: §{unit.concept} {border[len(unit.concept) + 10:]}")
-    print()

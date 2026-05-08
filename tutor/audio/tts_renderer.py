@@ -5,7 +5,7 @@ from pathlib import Path
 import edge_tts
 from pydub import AudioSegment
 
-from tutor.constants import RATE_STUDENT, RATE_TUTOR, VOICE_STUDENT, VOICE_TUTOR
+from tutor.constants import RATE_COTUTOR, RATE_STUDENT, RATE_TUTOR, VOICE_COTUTOR, VOICE_STUDENT, VOICE_TUTOR
 from tutor.exceptions import TTSError
 from tutor.models import DialogueLine, RenderedSegment
 
@@ -14,13 +14,13 @@ log = logging.getLogger(__name__)
 VOICE_MAP: dict[str, str] = {
     "ALEX": VOICE_TUTOR,
     "MAYA": VOICE_STUDENT,
-    "SAM": VOICE_TUTOR,  # SAM voice overridden on Day 6
+    "SAM": VOICE_COTUTOR,
 }
 
 RATE_MAP: dict[str, str] = {
     "ALEX": RATE_TUTOR,
     "MAYA": RATE_STUDENT,
-    "SAM": RATE_TUTOR,
+    "SAM": RATE_COTUTOR,
 }
 
 

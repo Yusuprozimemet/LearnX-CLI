@@ -20,6 +20,7 @@ def plan(
     duration_min: int,
     llm_fn,
     difficulty: str = "beginner",
+    topic: str | None = None,
 ) -> list[TeachingUnit]:
     summaries = "\n".join(f"[{c.chunk_id}] {c.summary}" for c in chunks)
     difficulty_context = DIFFICULTY_CONTEXT.get(difficulty, DIFFICULTY_CONTEXT["beginner"])
@@ -31,6 +32,14 @@ def plan(
         difficulty_context=difficulty_context,
         summaries=summaries,
     )
+
+    if topic:
+        topic_instruction = (
+            f'IMPORTANT: You must include a unit that covers the topic "{topic}". '
+            "If the source document does not mention it, create a unit that acknowledges "
+            "it is out of scope but explains why it matters in relation to what was covered."
+        )
+        prompt = topic_instruction + "\n\n" + prompt
 
     messages = [{"role": "user", "content": prompt}]
     log.info("Planning curriculum for %d chunks, %d min target", len(chunks), duration_min)

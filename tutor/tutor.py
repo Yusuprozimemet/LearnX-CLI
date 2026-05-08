@@ -1,9 +1,11 @@
 import argparse
 import asyncio
 import io
+import json
 import logging
 import shutil
 import sys
+from dataclasses import asdict
 from functools import partial
 from pathlib import Path
 
@@ -13,9 +15,9 @@ from tutor.constants import (
     DEFAULT_DURATION_MIN,
     DEFAULT_FORMAT,
     DEFAULT_SUBJECT,
+    WPM,
 )
 from tutor.audio import audio_builder
-from tutor.constants import WPM
 from tutor.exceptions import TutorError
 from tutor.generation import assembler, curriculum, dialogue
 from tutor.infra import llm
@@ -95,27 +97,20 @@ def cmd_generate(args) -> None:
             print("Cache cleared (all summaries and dialogues will be regenerated).")
 
     profile = doc_analyzer.analyze(args.input)
-    text = Path(args.input).read_text(encoding="utf-8")
-    chunks = chunker.chunk(text, profile)
+    chunks = chunker.chunk(Path(args.input).read_text(encoding="utf-8"), profile)
 
     if not args.inspect:
         chunks = summarizer.summarize_all(chunks, llm_fn)
-
-    if not args.inspect:
-        import json
-        from dataclasses import asdict as _asdict
-        chunks_path = Path(args.output).parent / "tutorial.chunks.json"
-        with open(chunks_path, "w", encoding="utf-8") as f:
-            json.dump([_asdict(c) for c in chunks], f, indent=2, ensure_ascii=False)
+        _save_chunks(chunks, args.output)
 
     if args.inspect:
-        inspector.report_ingestion(profile, chunks)
-        if args.show_summaries:
-            for c in chunks:
-                print(f"\n--- {c.chunk_id} ---\n{c.summary}")
+        _run_inspect(args, profile, chunks)
         return
 
-    units = curriculum.plan(chunks, profile, args.duration, llm_fn, args.difficulty)
+    if args.subject not in ("java", "general"):
+        print(f"Warning: --subject {args.subject!r} is not supported yet; proceeding as 'general'.")
+
+    units = curriculum.plan(chunks, profile, args.duration, llm_fn, args.difficulty, args.topic)
     if args.units:
         units = units[: args.units]
 
@@ -129,13 +124,34 @@ def cmd_generate(args) -> None:
     _print_duration_estimate(script)
 
     if args.script_only:
-        for line in script:
-            print(f"{line.speaker}: {line.text}")
+        _run_script_only(script)
         return
 
-    if getattr(args, "play", False) and args.script_only is False and args.dry_run is False:
-        pass  # play handled after audio generation below
+    _run_audio(args, units, script)
 
+    if getattr(args, "play", False):
+        cmd_play(args)
+
+
+def _run_inspect(args, profile, chunks) -> None:
+    inspector.report_ingestion(profile, chunks)
+    if args.show_summaries:
+        for c in chunks:
+            print(f"\n--- {c.chunk_id} ---\n{c.summary}")
+
+
+def _run_script_only(script: list[DialogueLine]) -> None:
+    for line in script:
+        print(f"{line.speaker}: {line.text}")
+
+
+def _save_chunks(chunks, output_path: str) -> None:
+    chunks_path = Path(output_path).parent / "tutorial.chunks.json"
+    with open(chunks_path, "w", encoding="utf-8") as f:
+        json.dump([asdict(c) for c in chunks], f, indent=2, ensure_ascii=False)
+
+
+def _run_audio(args, units: list[TeachingUnit], script: list[DialogueLine]) -> None:
     script_path = Path(args.output).with_suffix(".script.txt")
     units_dir = str(Path(args.output).parent / "tutorial_units")
 
@@ -147,8 +163,6 @@ def cmd_generate(args) -> None:
 
     asyncio.run(audio_builder.build(script, args.output, units_dir))
 
-    import json
-    from dataclasses import asdict
     units_json_path = Path(args.output).parent / "tutorial.units.json"
     with open(units_json_path, "w", encoding="utf-8") as f:
         json.dump([asdict(u) for u in units], f, indent=2, ensure_ascii=False)
@@ -158,9 +172,6 @@ def cmd_generate(args) -> None:
     print(f"  Units:  {units_dir}/")
     print(f"  Script: {script_path}")
     print(f"  Meta:   {units_json_path}")
-
-    if getattr(args, "play", False):
-        cmd_play(args)
 
 
 def cmd_play(args) -> None:
