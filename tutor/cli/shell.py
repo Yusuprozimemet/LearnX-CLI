@@ -3,6 +3,10 @@ import sys
 from tutor.cli.logo import print_welcome
 from tutor.cli.commands import COMMAND_MAP, ShellContext
 from tutor.cli import theme
+from tutor.cli.video_commands import cmd_video, cmd_vsessions
+
+COMMAND_MAP["/video"]     = cmd_video
+COMMAND_MAP["/vsessions"] = cmd_vsessions
 
 
 def _build_prompt(ctx: ShellContext) -> str:
