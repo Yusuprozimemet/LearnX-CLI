@@ -20,6 +20,7 @@ def _build_prompt(ctx: ShellContext) -> str:
 
 def run_shell() -> None:
     _setup_utf8()
+    _prime_ffmpeg()
     print_welcome()
     ctx = ShellContext()
 
@@ -62,6 +63,15 @@ def _graceful_exit(ctx: ShellContext) -> None:
         if ctx.player_thread:
             ctx.player_thread.join(timeout=2.0)
     print(theme.dim("  Goodbye!\n"))
+
+
+def _prime_ffmpeg() -> None:
+    """Inject ffmpeg into PATH before pydub is imported so its warning never fires."""
+    try:
+        from tutor.config import _check_ffmpeg
+        _check_ffmpeg()
+    except Exception:
+        pass
 
 
 def _setup_utf8() -> None:
