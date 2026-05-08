@@ -127,6 +127,7 @@ def _check_graphviz() -> None:
         search_roots = [
             Path("C:/Program Files/Graphviz"),
             Path("C:/Graphviz"),
+            Path("C:/graphviz"),          # portable zip extracted here
         ]
         for root in search_roots:
             if not root.exists():
