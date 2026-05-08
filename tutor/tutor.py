@@ -175,8 +175,13 @@ def _run_audio(args, units: list[TeachingUnit], script: list[DialogueLine]) -> N
 
 
 def cmd_play(args) -> None:
+    player = _build_player(args)
+    player.run()
+
+
+def _build_player(args):
+    """Build and return a configured TutorPlayer without starting it."""
     import json
-    import logging
     from datetime import datetime
     from functools import partial as _partial
     from tutor.player.player import TutorPlayer
@@ -185,7 +190,7 @@ def cmd_play(args) -> None:
     from tutor.config import load_config
     from tutor.infra import llm as _llm
 
-    log = logging.getLogger(__name__)
+    _log = logging.getLogger(__name__)
 
     if hasattr(args, "audio_file"):
         audio_path = Path(args.audio_file)
@@ -196,7 +201,7 @@ def cmd_play(args) -> None:
     if not units_dir.exists():
         raise PlayerError(
             f"tutorial_units/ not found at {units_dir}.\n"
-            "  Run generation first: python tutor.py <input.md> --output <file.mp3>"
+            "  Run generation first or use /generate."
         )
 
     unit_files = sorted(units_dir.glob("*.mp3"))
@@ -234,7 +239,7 @@ def cmd_play(args) -> None:
         chunks = [Chunk(**c) for c in raw_chunks]
     else:
         chunks = []
-        log.warning("tutorial.chunks.json not found — Q&A will work without source context")
+        _log.warning("tutorial.chunks.json not found — Q&A will work without source context")
 
     no_qa = getattr(args, "no_qa", False)
     provider = getattr(args, "provider", "groq")
@@ -246,7 +251,7 @@ def cmd_play(args) -> None:
             llm_fn = _partial(_llm.chat, provider=provider, config=config)
         except Exception:
             llm_fn = None
-            log.warning("Could not load config for Q&A — Q&A will be unavailable")
+            _log.warning("Could not load config for Q&A — Q&A will be unavailable")
 
     session = SessionLog(
         source_file=str(getattr(args, "audio_file", getattr(args, "output", "unknown"))),
@@ -255,7 +260,7 @@ def cmd_play(args) -> None:
         duration_minutes=20,
     )
 
-    player = TutorPlayer(
+    return TutorPlayer(
         unit_files=[str(f) for f in unit_files],
         units=units,
         chunks=chunks,
@@ -263,7 +268,26 @@ def cmd_play(args) -> None:
         llm_fn=llm_fn,
         no_qa=no_qa,
     )
-    player.run()
+
+
+def _make_generate_parser() -> argparse.ArgumentParser:
+    """Return an ArgumentParser for the /generate shell command."""
+    parser = argparse.ArgumentParser(prog="generate", add_help=False)
+    parser.add_argument("input", nargs="?")
+    parser.add_argument("--output", default="tutorial.mp3")
+    parser.add_argument("--provider", default="groq")
+    parser.add_argument("--duration", type=int, default=DEFAULT_DURATION_MIN)
+    parser.add_argument("--format", default=DEFAULT_FORMAT, dest="fmt")
+    parser.add_argument("--difficulty", default=DEFAULT_DIFFICULTY)
+    parser.add_argument("--units", type=int, default=None)
+    parser.add_argument("--subject", default=DEFAULT_SUBJECT)
+    parser.add_argument("--topic", default=None)
+    parser.add_argument("--script-only", action="store_true", dest="script_only")
+    parser.add_argument("--dry-run", action="store_true", dest="dry_run")
+    parser.add_argument("--inspect", action="store_true")
+    parser.add_argument("--show-summaries", action="store_true", dest="show_summaries")
+    parser.add_argument("--no-cache", action="store_true", dest="no_cache")
+    return parser
 
 
 def _mode(args) -> str:

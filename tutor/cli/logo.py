@@ -1,0 +1,21 @@
+from tutor.cli import theme
+
+LOGO = r"""
+██╗     ███████╗ █████╗ ██████╗ ███╗   ██╗██╗  ██╗
+██║     ██╔════╝██╔══██╗██╔══██╗████╗  ██║╚██╗██╔╝
+██║     █████╗  ███████║██████╔╝██╔██╗ ██║ ╚███╔╝
+██║     ██╔══╝  ██╔══██║██╔══██╗██║╚██╗██║ ██╔██╗
+███████╗███████╗██║  ██║██║  ██║██║ ╚████║██╔╝ ██╗
+╚══════╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝
+"""
+
+TAGLINE = "Audio tutorials from any Markdown document"
+VERSION = "v1.0"
+DIVIDER = "─" * 54
+
+
+def print_welcome() -> None:
+    print(theme.CYAN + LOGO + theme.RESET, end="")
+    print(f"  {theme.bold(TAGLINE)}   {theme.dim(VERSION)}")
+    print(theme.dim(f"  {DIVIDER}"))
+    print(theme.dim("  Type /help to see available commands.\n"))

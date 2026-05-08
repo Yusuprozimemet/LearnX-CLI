@@ -234,6 +234,57 @@ class TutorPlayer:
     def _get_duration(self, filepath: str) -> int:
         return self._duration_cache.get(filepath, 0)
 
+    def run_in_shell(self) -> None:
+        """Headless playback loop for the interactive shell — no keyboard, no status bar."""
+        os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+        pygame.init()
+        pygame.mixer.init()
+        pygame.mixer.music.set_endevent(MUSIC_END)
+
+        self._load_unit(0)
+        self._play()
+
+        poll_interval = 1.0 / PLAYER_POLL_HZ
+
+        try:
+            while self._state != "STOPPED":
+                self._handle_events()
+                time.sleep(poll_interval)
+        finally:
+            pygame.mixer.quit()
+            pygame.quit()
+
+    def _ask_question_from_shell(self, question: str) -> None:
+        """Answer a question posed from the shell thread (question already collected)."""
+        if self.no_qa or self.llm_fn is None:
+            from tutor.cli import theme
+            print(theme.yellow("  Q&A is disabled (no API key or --no-qa set)."))
+            return
+        if self._current_idx >= len(self.units):
+            from tutor.cli import theme
+            print(theme.red("  No unit loaded."))
+            return
+
+        self._state = "ANSWERING"
+        from tutor.cli import theme
+        print(theme.dim("  Thinking..."))
+
+        from tutor.qa import qa
+        current_unit = self.units[self._current_idx]
+        answer_text = qa.answer(
+            question=question,
+            current_unit=current_unit,
+            all_chunks=self.chunks,
+            session=self.session,
+            llm_fn=self.llm_fn,
+            position_seconds=self._elapsed_seconds(),
+        )
+        self.qa_count += 1
+
+        print(f"\n  {theme.bold(current_unit.concept)}")
+        print(f"  {answer_text}\n")
+        self._state = "PAUSED"
+
     def _on_session_complete(self) -> None:
         self._state = "STOPPED"
         player_display.print_session_complete(
