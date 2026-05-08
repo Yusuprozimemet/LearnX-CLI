@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -79,9 +80,39 @@ def _check_ffmpeg() -> None:
             stderr=subprocess.DEVNULL,
             check=True,
         )
-    except (FileNotFoundError, subprocess.CalledProcessError) as e:
-        raise ConfigError(
-            "ffmpeg not found in PATH.\n"
-            "  Install with: winget install ffmpeg\n"
-            "  Then restart your terminal."
-        ) from e
+        return
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        pass
+
+    # PATH doesn't have ffmpeg — probe common Windows install layouts.
+    if sys.platform == "win32":
+        candidates: list[Path] = [
+            Path("C:/ffmpeg/bin/ffmpeg.exe"),
+            *Path("C:/ffmpeg").glob("*/bin/ffmpeg.exe"),
+            Path("C:/Program Files/ffmpeg/bin/ffmpeg.exe"),
+            *Path("C:/Program Files/ffmpeg").glob("*/bin/ffmpeg.exe"),
+            Path("C:/tools/ffmpeg/bin/ffmpeg.exe"),
+        ]
+        for candidate in candidates:
+            if candidate.exists():
+                _inject_ffmpeg(candidate.parent)
+                return
+
+    raise ConfigError(
+        "ffmpeg not found in PATH.\n"
+        "  Install with: winget install ffmpeg\n"
+        "  Or add its bin\\ folder to your system PATH and restart the terminal."
+    )
+
+
+def _inject_ffmpeg(bin_dir: Path) -> None:
+    """Add a discovered ffmpeg directory to the process PATH so pydub finds it."""
+    os.environ["PATH"] = str(bin_dir) + os.pathsep + os.environ.get("PATH", "")
+    # Patch pydub's runtime converter path if pydub is already imported.
+    try:
+        import pydub
+        pydub.AudioSegment.converter = str(bin_dir / "ffmpeg.exe")
+        pydub.AudioSegment.ffmpeg = str(bin_dir / "ffmpeg.exe")
+        pydub.AudioSegment.ffprobe = str(bin_dir / "ffprobe.exe")
+    except Exception:
+        pass
