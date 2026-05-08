@@ -101,6 +101,13 @@ def cmd_generate(args) -> None:
     if not args.inspect:
         chunks = summarizer.summarize_all(chunks, llm_fn)
 
+    if not args.inspect:
+        import json
+        from dataclasses import asdict as _asdict
+        chunks_path = Path(args.output).parent / "tutorial.chunks.json"
+        with open(chunks_path, "w", encoding="utf-8") as f:
+            json.dump([_asdict(c) for c in chunks], f, indent=2, ensure_ascii=False)
+
     if args.inspect:
         inspector.report_ingestion(profile, chunks)
         if args.show_summaries:
@@ -158,9 +165,16 @@ def cmd_generate(args) -> None:
 
 def cmd_play(args) -> None:
     import json
+    import logging
+    from datetime import datetime
+    from functools import partial as _partial
     from tutor.player.player import TutorPlayer
-    from tutor.models import TeachingUnit
+    from tutor.models import TeachingUnit, Chunk, SessionLog
     from tutor.exceptions import PlayerError
+    from tutor.config import load_config
+    from tutor.infra import llm as _llm
+
+    log = logging.getLogger(__name__)
 
     if hasattr(args, "audio_file"):
         audio_path = Path(args.audio_file)
@@ -202,7 +216,42 @@ def cmd_play(args) -> None:
             for i, f in enumerate(unit_files)
         ]
 
-    player = TutorPlayer(unit_files=[str(f) for f in unit_files], units=units)
+    chunks_path = units_dir.parent / "tutorial.chunks.json"
+    if chunks_path.exists():
+        with open(chunks_path, encoding="utf-8") as f:
+            raw_chunks = json.load(f)
+        chunks = [Chunk(**c) for c in raw_chunks]
+    else:
+        chunks = []
+        log.warning("tutorial.chunks.json not found — Q&A will work without source context")
+
+    no_qa = getattr(args, "no_qa", False)
+    provider = getattr(args, "provider", "groq")
+    if no_qa:
+        llm_fn = None
+    else:
+        try:
+            config = load_config()
+            llm_fn = _partial(_llm.chat, provider=provider, config=config)
+        except Exception:
+            llm_fn = None
+            log.warning("Could not load config for Q&A — Q&A will be unavailable")
+
+    session = SessionLog(
+        source_file=str(getattr(args, "audio_file", getattr(args, "output", "unknown"))),
+        session_start=datetime.utcnow().isoformat(),
+        format="tutor-student",
+        duration_minutes=20,
+    )
+
+    player = TutorPlayer(
+        unit_files=[str(f) for f in unit_files],
+        units=units,
+        chunks=chunks,
+        session=session,
+        llm_fn=llm_fn,
+        no_qa=no_qa,
+    )
     player.run()
 
 
