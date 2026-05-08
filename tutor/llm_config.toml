@@ -1,0 +1,51 @@
+# ============================================================
+#  LearnX LLM configuration
+#  Edit this file to change models or token budgets.
+#  No Python code changes required.
+# ============================================================
+
+# ── Model selection ─────────────────────────────────────────
+# One model name per call_type per provider.
+# call_types: curriculum | dialogue | summarize | qa
+
+[providers.groq]
+curriculum = "llama-3.3-70b-versatile"
+dialogue   = "llama-3.1-8b-instant"
+summarize  = "llama-3.1-8b-instant"
+qa         = "llama-3.1-8b-instant"
+
+[providers.openrouter]
+curriculum = "google/gemma-3-27b-it:free"
+dialogue   = "meta-llama/llama-3.1-8b-instruct:free"
+summarize  = "meta-llama/llama-3.1-8b-instruct:free"
+qa         = "meta-llama/llama-3.1-8b-instruct:free"
+
+# ── Response token caps ──────────────────────────────────────
+# Max tokens the model may generate per call type.
+# Together with the input prompt they must stay under the
+# provider's per-request token limit (Groq free tier: 6 000).
+
+[max_tokens]
+curriculum = 2000
+dialogue   = 1500
+summarize  = 400
+qa         = 600
+
+# ── Input size limits ────────────────────────────────────────
+# max_source_tokens:          source text sent with each dialogue prompt
+# max_summarize_input_tokens: chunk text sent to the summariser
+#
+# Rule of thumb for Groq free tier (6 000-token cap):
+#   max_source_tokens + ~830 (prompt overhead) + max_tokens.dialogue < 6 000
+#   → max_source_tokens ≤ 3 670  (currently 1 500 for a comfortable margin)
+
+[limits]
+max_source_tokens          = 1500
+max_summarize_input_tokens = 3000
+
+# ── Call behaviour ───────────────────────────────────────────
+
+[llm]
+temperature   = 0.7
+retry_count   = 2       # attempts before giving up
+retry_delay_s = 2.0     # seconds between retries

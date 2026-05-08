@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import sys
 import time
 from pathlib import Path
 
@@ -11,26 +12,47 @@ from tutor.exceptions import ConfigError, LLMError
 
 log = logging.getLogger(__name__)
 
-MODEL_MAP = {
-    ("groq", "curriculum"): "llama-3.3-70b-versatile",
-    ("groq", "dialogue"): "llama-3.1-8b-instant",
-    ("groq", "summarize"): "llama-3.1-8b-instant",
-    ("groq", "qa"): "llama-3.1-8b-instant",
-    ("openrouter", "curriculum"): "google/gemma-3-27b-it:free",
-    ("openrouter", "dialogue"): "meta-llama/llama-3.1-8b-instruct:free",
-    ("openrouter", "summarize"): "meta-llama/llama-3.1-8b-instruct:free",
-    ("openrouter", "qa"): "meta-llama/llama-3.1-8b-instruct:free",
+# ---------------------------------------------------------------------------
+# Config loading — reads tutor/llm_config.toml at import time
+# ---------------------------------------------------------------------------
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    try:
+        import tomli as tomllib          # pip install tomli for Python < 3.11
+    except ImportError as _err:
+        raise ImportError("Python < 3.11 requires 'tomli': pip install tomli") from _err
+
+_CONFIG_PATH = Path(__file__).parent.parent / "llm_config.toml"
+
+
+def _load() -> dict:
+    with open(_CONFIG_PATH, "rb") as fh:
+        return tomllib.load(fh)
+
+
+_cfg = _load()
+
+# Public dicts built from the TOML — used by chat() below and exported for
+# other modules that need to read limits (dialogue.py, summarizer.py).
+MODEL_MAP: dict[tuple[str, str], str] = {
+    (provider, call_type): model
+    for provider, calls in _cfg["providers"].items()
+    for call_type, model in calls.items()
 }
 
-# Max *response* tokens per call type — keeps total request well under the
-# Groq free-tier 6 k-token-per-request cap (input + output combined).
-MAX_TOKENS_MAP = {
-    "curriculum": 2_000,
-    "dialogue":   1_500,
-    "summarize":  400,
-    "qa":         600,
-}
+MAX_TOKENS_MAP: dict[str, int] = _cfg["max_tokens"]
+LIMITS: dict[str, int] = _cfg["limits"]
 
+_temperature: float = _cfg["llm"]["temperature"]
+_retry_count: int = _cfg["llm"]["retry_count"]
+_retry_delay_s: float = _cfg["llm"]["retry_delay_s"]
+
+
+# ---------------------------------------------------------------------------
+# Client factory
+# ---------------------------------------------------------------------------
 
 def _build_client(provider: str, config: Config) -> OpenAI:
     if provider == "groq":
@@ -54,6 +76,10 @@ def _build_client(provider: str, config: Config) -> OpenAI:
     raise ConfigError(f"Unknown provider: {provider!r}. Use 'groq' or 'openrouter'.")
 
 
+# ---------------------------------------------------------------------------
+# Chat
+# ---------------------------------------------------------------------------
+
 def chat(
     messages: list[dict],
     config: Config,
@@ -62,19 +88,19 @@ def chat(
 ) -> str:
     model = MODEL_MAP.get((provider, call_type))
     if model is None:
-        raise LLMError(f"No model configured for ({provider}, {call_type})")
+        raise LLMError(f"No model configured for ({provider!r}, {call_type!r}) in llm_config.toml")
 
     client = _build_client(provider, config)
     log.debug("LLM call provider=%s call_type=%s model=%s", provider, call_type, model)
 
     max_tokens = MAX_TOKENS_MAP.get(call_type, 1_000)
 
-    for attempt in range(2):
+    for attempt in range(_retry_count):
         try:
             response = client.chat.completions.create(
                 model=model,
                 messages=messages,
-                temperature=0.7,
+                temperature=_temperature,
                 max_tokens=max_tokens,
             )
             content = response.choices[0].message.content
@@ -86,16 +112,21 @@ def chat(
                 raise LLMError(f"Auth/request error ({status}): {e}") from e
             if status == 413:
                 raise LLMError(
-                    f"Request too large for {model} — reduce source text or word budget. ({e})"
+                    f"Request too large for {model}.\n"
+                    f"  Lower max_source_tokens or max_tokens.{call_type} in llm_config.toml."
                 ) from e
-            if attempt == 0:
-                log.warning("LLM call failed (%s), retrying in 2s...", e)
-                time.sleep(2)
+            if attempt < _retry_count - 1:
+                log.warning("LLM call failed (%s), retrying in %.1fs...", e, _retry_delay_s)
+                time.sleep(_retry_delay_s)
                 continue
-            raise LLMError(f"LLM call failed after retry: {e}") from e
+            raise LLMError(f"LLM call failed after {_retry_count} attempts: {e}") from e
 
     raise LLMError("Unreachable")
 
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def parse_json_response(raw: str) -> object:
     text = re.sub(r"```(?:json)?\s*", "", raw).strip().rstrip("`").strip()

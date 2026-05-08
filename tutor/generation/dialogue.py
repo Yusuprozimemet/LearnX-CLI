@@ -4,9 +4,9 @@ import logging
 import re
 from pathlib import Path
 
-from tutor.constants import MAX_SOURCE_TOKENS, PROMPT_VERSION, SUMMARY_CACHE_DIR
+from tutor.constants import PROMPT_VERSION, SUMMARY_CACHE_DIR
 from tutor.exceptions import LLMError
-from tutor.infra.llm import load_prompt, parse_json_response
+from tutor.infra.llm import LIMITS, load_prompt, parse_json_response
 from tutor.models import Chunk, DialogueLine, TeachingUnit
 
 log = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ def generate(
     if not relevant:
         relevant = source_chunks[:2]
     source_text = "\n\n".join(f"## {c.heading}\n{c.text}" for c in relevant)
-    source_text = _truncate_source(source_text, MAX_SOURCE_TOKENS)
+    source_text = _truncate_source(source_text, LIMITS["max_source_tokens"])
 
     unit_json = json.dumps({
         "concept": unit.concept,

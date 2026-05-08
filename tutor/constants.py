@@ -56,10 +56,7 @@ DIFFICULTY_MULTIPLIERS: dict[str, float] = {
     "advanced": 0.8,
 }
 
-# Source token cap — keep dialogue requests under Groq free-tier limit (6 k TPM)
-MAX_SOURCE_TOKENS = 1_500
-# Chunk text cap before summarisation (larger is fine; summarize prompt is tiny)
-MAX_SUMMARIZE_INPUT_TOKENS = 3_000
+# Source/summarise token limits live in tutor/llm_config.toml (limits section)
 
 # Versioning
 PROMPT_VERSION = "v1"
