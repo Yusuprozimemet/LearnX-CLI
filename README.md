@@ -4,7 +4,9 @@
 
 Turn any Markdown document into an interactive audio tutorial with a live Q&A engine — all from a branded terminal shell.
 
-![LearnX CLI](learnX.png)
+<p align="center">
+  <img src="learnX.png" alt="LearnX CLI" />
+</p>
 
 ---
 
