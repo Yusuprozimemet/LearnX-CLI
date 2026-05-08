@@ -300,7 +300,7 @@ ffmpeg -i full_session.mp4 -i subtitles.srt -c copy -c:s mov_text full_session_s
 
 ```
 /video [session-name]     Generate video for a session (must run /generate first)
-/video week2_3            Generates audio/week2_3/full_session.mp4
+/video week2_3            Generates video/week2_3/full_session.mp4
 ```
 
 `/generate` will gain a `--video` flag that runs the full pipeline in one go:
@@ -308,7 +308,53 @@ ffmpeg -i full_session.mp4 -i subtitles.srt -c copy -c:s mov_text full_session_s
 /generate week2/3.md --video
 ```
 
-`/sessions` will show a `[video]` tag next to sessions that have an MP4.
+`/sessions` will show a `[mp4]` badge next to sessions that have a video.
+
+---
+
+## Output structure
+
+```
+audio/<session>/             ← audio pipeline (UNCHANGED)
+  tutorial.mp3
+  tutorial.units.json
+  tutorial.chunks.json
+  tutorial_units/unit_*.mp3
+
+video/<session>/             ← video pipeline (NEW, separate folder)
+  tutorial.visuals.json
+  slides/
+    00_title.png ... 99_outro.png
+  unit_01.mp4 ... unit_N.mp4
+  full_session.mp4
+  subtitles.srt
+```
+
+The video pipeline reads from `audio/<session>/` and writes to `video/<session>/`.
+The two directories never overlap.
+
+---
+
+## File size discipline
+
+Every Python file in the v2 visual pipeline must stay under 400 lines.
+Files that would exceed this are split at clear conceptual boundaries:
+
+| Day 10 — Slide compositor | split into 3 files |
+|---|---|
+| `slide_theme.py` | colour constants, spacing grid, font loading |
+| `slide_draw.py` | `_draw_*` primitive functions |
+| `slide_compositor.py` | `compose_*` public API |
+
+| Day 11 — Video pipeline | split into 3 files |
+|---|---|
+| `subtitle_writer.py` | dialogue → SRT |
+| `beat_timer.py` | slide timing from line offsets |
+| `video_assembler.py` | ffmpeg command wrappers |
+
+| Day 12 — Shell | separate file |
+|---|---|
+| `video_commands.py` | `/video`, `/vsessions` handlers (not in commands.py) |
 
 ---
 
@@ -316,45 +362,37 @@ ffmpeg -i full_session.mp4 -i subtitles.srt -c copy -c:s mov_text full_session_s
 
 ### Day 8 — Visual spec generation
 - Add `"visual"` call_type to `llm_config.toml`
-- `tutor/generation/visual_planner.py` — prompt, LLM call, JSON parse, cache
-- `tutorial.visuals.json` written alongside other outputs
-- Tests: mock LLM, verify JSON schema, test 4 diagram type paths
+- `VisualSpec` dataclass added to `tutor/models.py`
+- `VideoError` added to `tutor/exceptions.py`
+- `tutor/generation/visual_planner.py` — LLM call, JSON parse, cache
+- Output: `video/<session>/tutorial.visuals.json`
+- Existing audio pipeline untouched
 
 ### Day 9 — Diagram rendering
-- `tutor/visual/diagram_renderer.py`
-  - `render_class_diagram(spec)` → PNG via graphviz
-  - `render_flowchart(spec)` → PNG via graphviz
-  - `render_code_comparison(wrong, right)` → PNG via Pillow
-  - `render_concept_map(spec)` → PNG via graphviz
-  - `render_analogy_fallback(text)` → PNG via Pillow
-- Tests: render one of each type, assert file exists and is valid PNG
+- `tutor/visual/diagram_renderer.py` — single file, under 400 lines
+- 3 graphviz types share `_render_graphviz()` helper
+- 2 Pillow types: `code_comparison`, `analogy_fallback`
+- Output: `video/<session>/slides/unit_N_diagram.png`
 
-### Day 10 — Slide compositor
-- `tutor/visual/slide_compositor.py`
-  - `compose_hook_slide(unit, visual_spec)` → PNG
-  - `compose_concept_slide(unit, visual_spec, diagram_png)` → PNG
-  - `compose_memory_slide(unit, visual_spec)` → PNG
-  - `compose_title_card(doc_title)` + `compose_outro_card(stats)` → PNG
-- Consistent palette: dark background (#1a1a2e), cyan accent (#00b4d8), white text
-- Tests: compose all slide types, check pixel dimensions (1920×1080)
+### Day 10 — Slide compositor (3 files)
+- `tutor/visual/slide_theme.py` — constants + font loading (~120 lines)
+- `tutor/visual/slide_draw.py` — draw primitives (~220 lines)
+- `tutor/visual/slide_compositor.py` — compose_* API (~250 lines)
+- Output: `video/<session>/slides/*.png`
 
-### Day 11 — Subtitle writer + video assembler
-- `tutor/visual/subtitle_writer.py`
-  - `build_srt(dialogue_lines, unit_start_offset)` → SRT string
-  - Timing estimated from word count
-- `tutor/visual/video_assembler.py`
-  - `build_unit_video(unit_idx, mp3, slide_pngs, timings)` → MP4
-  - `build_session_video(unit_mp4s)` → full_session.mp4
-  - `embed_subtitles(mp4, srt)` → final MP4
-- Tests: mock ffmpeg, verify concat script content and subprocess calls
+### Day 11 — Subtitle writer + video assembler (3 files)
+- `tutor/visual/subtitle_writer.py` — SRT generation (~110 lines)
+- `tutor/visual/beat_timer.py` — slide timing (~120 lines)
+- `tutor/visual/video_assembler.py` — ffmpeg commands (~200 lines)
+- Output: `video/<session>/subtitles.srt`, `*.mp4`, `full_session.mp4`
 
-### Day 12 — Shell integration + polish
-- `/video` command in `commands.py`
-- `--video` flag in `_make_generate_parser()`
-- `cmd_generate` flow: if `--video`, call video pipeline after audio
-- `/sessions` shows `[mp4]` badge if `full_session.mp4` exists
-- Progress output during video generation
-- Update README
+### Day 12 — Shell integration
+- `tutor/visual/__init__.py` — `run_visual_pipeline()` entry point (~150 lines)
+- `tutor/cli/video_commands.py` — `/video`, `/vsessions` (~200 lines)
+- `tutor/cli/shell.py` — 4-line COMMAND_MAP patch only
+- `tutor/tutor.py` — add `--video` flag to parser only
+- `tutor/cli/commands.py` — add `--video` dispatch + `[mp4]` badge only
+- Font files committed to `tutor/assets/fonts/`
 
 ---
 
