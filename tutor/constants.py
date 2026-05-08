@@ -29,6 +29,7 @@ OVERHEAD_WORDS = 200  # intro + transitions + outro
 
 # Player
 PLAYER_POLL_HZ = 10
+PLAYER_BAR_WIDTH = 40
 
 # Difficulty
 DIFFICULTY_CONTEXT: dict[str, str] = {

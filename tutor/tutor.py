@@ -76,7 +76,11 @@ def _run_play() -> None:
     parser.add_argument("--debug", action="store_true")
     args = parser.parse_args(sys.argv[2:])
     _setup_logging(args)
-    print("Interactive player not yet implemented — coming on Day 4.")
+    try:
+        cmd_play(args)
+    except TutorError as e:
+        print(f"\n✗ {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def cmd_generate(args) -> None:
@@ -136,13 +140,70 @@ def cmd_generate(args) -> None:
 
     asyncio.run(audio_builder.build(script, args.output, units_dir))
 
+    import json
+    from dataclasses import asdict
+    units_json_path = Path(args.output).parent / "tutorial.units.json"
+    with open(units_json_path, "w", encoding="utf-8") as f:
+        json.dump([asdict(u) for u in units], f, indent=2, ensure_ascii=False)
+
     print(f"\nDone.")
     print(f"  Audio:  {args.output}")
     print(f"  Units:  {units_dir}/")
     print(f"  Script: {script_path}")
+    print(f"  Meta:   {units_json_path}")
 
     if getattr(args, "play", False):
-        print("\nInteractive player not yet implemented — coming on Day 4.")
+        cmd_play(args)
+
+
+def cmd_play(args) -> None:
+    import json
+    from tutor.player.player import TutorPlayer
+    from tutor.models import TeachingUnit
+    from tutor.exceptions import PlayerError
+
+    if hasattr(args, "audio_file"):
+        audio_path = Path(args.audio_file)
+        units_dir = audio_path if audio_path.is_dir() else audio_path.parent / "tutorial_units"
+    else:
+        units_dir = Path(args.output).parent / "tutorial_units"
+
+    if not units_dir.exists():
+        raise PlayerError(
+            f"tutorial_units/ not found at {units_dir}.\n"
+            "  Run generation first: python tutor.py <input.md> --output <file.mp3>"
+        )
+
+    unit_files = sorted(units_dir.glob("*.mp3"))
+    if not unit_files:
+        raise PlayerError(f"No .mp3 files found in {units_dir}")
+
+    units_json = units_dir.parent / "tutorial.units.json"
+    if units_json.exists():
+        with open(units_json, encoding="utf-8") as f:
+            raw_units = json.load(f)
+        for u in raw_units:
+            u.setdefault("prerequisite_concepts", [])
+        units = [TeachingUnit(**u) for u in raw_units]
+    else:
+        units = [
+            TeachingUnit(
+                unit=i,
+                concept=f.stem.replace("_", " ").title(),
+                source_sections=[],
+                complexity=2,
+                word_budget=400,
+                key_facts=[],
+                common_misconception="",
+                good_analogy="",
+                question_style="recall",
+                memory_hook="",
+            )
+            for i, f in enumerate(unit_files)
+        ]
+
+    player = TutorPlayer(unit_files=[str(f) for f in unit_files], units=units)
+    player.run()
 
 
 def _mode(args) -> str:
