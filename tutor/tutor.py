@@ -287,6 +287,8 @@ def _make_generate_parser() -> argparse.ArgumentParser:
     parser.add_argument("--inspect", action="store_true")
     parser.add_argument("--show-summaries", action="store_true", dest="show_summaries")
     parser.add_argument("--no-cache", action="store_true", dest="no_cache")
+    parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--debug", action="store_true")
     return parser
 
 

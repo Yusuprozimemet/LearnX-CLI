@@ -51,6 +51,15 @@ def _parse_generate_args(tokens: list[str]):
         return None
 
 
+def _apply_log_level(args) -> None:
+    """Apply --verbose / --debug to the live logger without re-running basicConfig."""
+    import logging as _logging
+    if getattr(args, "debug", False):
+        _logging.getLogger().setLevel(_logging.DEBUG)
+    elif getattr(args, "verbose", False):
+        _logging.getLogger().setLevel(_logging.INFO)
+
+
 # ---------------------------------------------------------------------------
 # Command handlers
 # ---------------------------------------------------------------------------
@@ -58,7 +67,8 @@ def _parse_generate_args(tokens: list[str]):
 def cmd_generate(tokens: list[str], ctx: ShellContext) -> None:
     """Usage: /generate <file.md> [--duration N] [--difficulty LEVEL]
               [--format FORMAT] [--topic TEXT] [--units N] [--no-cache]
-              [--script-only] [--dry-run] [--provider groq|openrouter]"""
+              [--script-only] [--dry-run] [--provider groq|openrouter]
+              [--verbose] [--debug]"""
     if not tokens:
         print(theme.red("  Error: /generate requires a file path."))
         print(theme.dim("  Example: /generate notes.md --difficulty intermediate"))
@@ -68,6 +78,8 @@ def cmd_generate(tokens: list[str], ctx: ShellContext) -> None:
     if args is None:
         print(theme.red("  Error: could not parse arguments."))
         return
+
+    _apply_log_level(args)
 
     from tutor import tutor as _tutor
     from tutor.exceptions import TutorError
