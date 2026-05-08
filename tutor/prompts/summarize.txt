@@ -1,0 +1,4 @@
+Summarize the following section of a Java tutorial in exactly 3 sentences.
+Focus on: what concept is introduced, what the learner is expected to understand,
+and one concrete detail (a class name, a rule, an example).
+Do not write "this section explains" — write as facts, not as a document summary.

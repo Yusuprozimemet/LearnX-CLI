@@ -1,0 +1,43 @@
+# Folders excluded from this repo
+week1/
+week2/
+systemDesign/
+
+# Generated audio output
+*.mp3
+*.script.txt
+*.units.json
+*.session.json
+tutorial_units/
+
+# TTS temp files
+.tts_tmp/
+
+# LLM cache (regenerated on demand)
+.tutor_cache/
+
+# Secrets — never commit
+tutor/.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Logs
+tutor.log
+*.log
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

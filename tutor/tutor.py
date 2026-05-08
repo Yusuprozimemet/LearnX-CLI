@@ -1,0 +1,177 @@
+import argparse
+import asyncio
+import io
+import logging
+import sys
+from functools import partial
+from pathlib import Path
+
+# Force UTF-8 output on Windows so LLM-generated unicode (≠, →, etc.) doesn't crash
+if hasattr(sys.stdout, "buffer"):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "buffer"):
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+
+from tutor.config import preflight
+from tutor.constants import (
+    DEFAULT_DIFFICULTY,
+    DEFAULT_DURATION_MIN,
+    DEFAULT_FORMAT,
+    DEFAULT_SUBJECT,
+)
+from tutor.audio import audio_builder
+from tutor.constants import WPM
+from tutor.exceptions import TutorError
+from tutor.generation import assembler, curriculum, dialogue
+from tutor.infra import llm
+from tutor.ingestion import chunker, doc_analyzer, summarizer
+from tutor import inspector
+from tutor.models import DialogueLine, TeachingUnit
+
+
+def main() -> None:
+    # Detect "play" subcommand before building the main parser — argparse
+    # cannot handle a positional that is either a subcommand or a file path.
+    if len(sys.argv) > 1 and sys.argv[1] == "play":
+        _run_play()
+        return
+
+    parser = argparse.ArgumentParser(prog="tutor", description="Tutor AI — Java audio sessions")
+    parser.add_argument("input", nargs="?", help="Path to input .md file")
+    parser.add_argument("--output", default="tutorial.mp3")
+    parser.add_argument("--provider", default="groq")
+    parser.add_argument("--duration", type=int, default=DEFAULT_DURATION_MIN)
+    parser.add_argument("--format", default=DEFAULT_FORMAT, dest="fmt")
+    parser.add_argument("--difficulty", default=DEFAULT_DIFFICULTY)
+    parser.add_argument("--units", type=int, default=None)
+    parser.add_argument("--subject", default=DEFAULT_SUBJECT)
+    parser.add_argument("--topic", default=None)
+    parser.add_argument("--play", action="store_true")
+    parser.add_argument("--script-only", action="store_true", dest="script_only")
+    parser.add_argument("--dry-run", action="store_true", dest="dry_run")
+    parser.add_argument("--inspect", action="store_true")
+    parser.add_argument("--show-summaries", action="store_true", dest="show_summaries")
+    parser.add_argument("--no-cache", action="store_true", dest="no_cache")
+    parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--debug", action="store_true")
+
+    args = parser.parse_args()
+    _setup_logging(args)
+
+    try:
+        cmd_generate(args)
+    except TutorError as e:
+        print(f"\n✗ {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def _run_play() -> None:
+    parser = argparse.ArgumentParser(prog="tutor play")
+    parser.add_argument("audio_file")
+    parser.add_argument("--provider", default="groq")
+    parser.add_argument("--no-qa", action="store_true", dest="no_qa")
+    parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--debug", action="store_true")
+    args = parser.parse_args(sys.argv[2:])
+    _setup_logging(args)
+    print("Interactive player not yet implemented — coming on Day 4.")
+
+
+def cmd_generate(args) -> None:
+    mode = _mode(args)
+    config = preflight(args.input, args.provider, mode)
+    llm_fn = partial(llm.chat, provider=args.provider, config=config)
+
+    profile = doc_analyzer.analyze(args.input)
+    text = Path(args.input).read_text(encoding="utf-8")
+    chunks = chunker.chunk(text, profile)
+
+    if not args.inspect:
+        chunks = summarizer.summarize_all(chunks, llm_fn)
+
+    if args.inspect:
+        inspector.report_ingestion(profile, chunks)
+        if args.show_summaries:
+            for c in chunks:
+                print(f"\n--- {c.chunk_id} ---\n{c.summary}")
+        return
+
+    units = curriculum.plan(chunks, profile, args.duration, llm_fn, args.difficulty)
+    if args.units:
+        units = units[: args.units]
+
+    if args.dry_run:
+        inspector.report_curriculum(units, chunks, args.duration)
+        return
+
+    all_lines = [dialogue.generate(u, chunks, args.fmt, llm_fn) for u in units]
+    doc_title = Path(args.input).stem.replace("-", " ").replace("_", " ").title()
+    script = assembler.assemble(units, all_lines, args.fmt, doc_title)
+    _print_duration_estimate(script)
+
+    if args.script_only:
+        for line in script:
+            print(f"{line.speaker}: {line.text}")
+        return
+
+    if getattr(args, "play", False) and args.script_only is False and args.dry_run is False:
+        pass  # play handled after audio generation below
+
+    script_path = Path(args.output).with_suffix(".script.txt")
+    units_dir = str(Path(args.output).parent / "tutorial_units")
+
+    with open(script_path, "w", encoding="utf-8") as f:
+        for line in script:
+            f.write(f"{line.speaker}: {line.text}\n")
+    print(f"Script saved: {script_path}")
+    print("Generating audio — this takes 2–4 minutes for a 20-min session...")
+
+    asyncio.run(audio_builder.build(script, args.output, units_dir))
+
+    print(f"\nDone.")
+    print(f"  Audio:  {args.output}")
+    print(f"  Units:  {units_dir}/")
+    print(f"  Script: {script_path}")
+
+    if getattr(args, "play", False):
+        print("\nInteractive player not yet implemented — coming on Day 4.")
+
+
+def _mode(args) -> str:
+    if getattr(args, "inspect", False):
+        return "inspect"
+    if getattr(args, "dry_run", False):
+        return "dry-run"
+    if getattr(args, "script_only", False):
+        return "script-only"
+    return "generate"  # triggers ffmpeg check in preflight
+
+
+def _print_duration_estimate(script: list[DialogueLine]) -> None:
+    total_words = sum(len(line.text.split()) for line in script)
+    dialogue_secs = (total_words / WPM) * 60
+    silence_secs = 80
+    total_secs = int(dialogue_secs + silence_secs)
+    mins, secs = divmod(total_secs, 60)
+    print(f"\n=== Duration Estimate ===")
+    print(f"Script words:  {total_words:,}")
+    print(f"Estimated:     ~{mins}m {secs:02d}s (incl. pauses)")
+
+
+def _setup_logging(args) -> None:
+    if getattr(args, "debug", False):
+        level = logging.DEBUG
+        logging.basicConfig(
+            level=level,
+            filename="tutor.log",
+            format="%(asctime)s %(name)s %(levelname)s %(message)s",
+        )
+    elif getattr(args, "verbose", False):
+        level = logging.INFO
+        logging.basicConfig(level=level, format="%(levelname)s %(message)s")
+    else:
+        logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(message)s")
+
+
+if __name__ == "__main__":
+    main()

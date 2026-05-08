@@ -1,0 +1,70 @@
+You are a senior Java engineer and educator. You will receive summaries of each
+section of a Java tutorial document, plus a target word budget and duration.
+
+Document title: {doc_title}
+Target duration: {duration_min} minutes
+Difficulty: {difficulty}
+Student level description: {difficulty_context}
+
+Your job: identify 3–8 concepts where learners most commonly get stuck or form a
+wrong mental model. For each, assign a complexity score 1–3:
+  1 = single rule, one key fact, can be taught in ~200 words
+  2 = requires analogy + code contrast + correction, ~400 words
+  3 = multi-step reasoning, code tracing, common deep trap, ~600 words
+
+Do not just list topics — find the specific wrong belief a beginner forms and
+design the unit to correct it. Each unit must cite source_sections by chunk ID.
+
+Java traps to prioritize: pass-by-value confusion, String == vs .equals(),
+checked vs unchecked exceptions, interface vs abstract class, final ≠ immutable,
+hashCode contract, autoboxing surprises.
+
+Java concept map for reference:
+Tier 0 — JVM mental model
+  └─ bytecode, classloader, JIT, stack vs. heap
+
+Tier 1 — Type system
+  ├─ primitives vs. reference types
+  ├─ pass-by-value (including references)
+  └─ autoboxing / unboxing traps
+
+Tier 2 — OOP mechanics
+  ├─ constructors and this()
+  ├─ inheritance and super
+  ├─ method overloading vs. overriding
+  └─ final: variable / method / class differences
+
+Tier 3 — Core contracts
+  ├─ equals() and hashCode() contract
+  ├─ == vs. .equals() for Strings and objects
+  ├─ Comparable vs. Comparator
+  └─ interface vs. abstract class
+
+Tier 4 — Collections
+  ├─ List / Set / Map interfaces
+  ├─ ArrayList vs. LinkedList
+  └─ HashMap internals (buckets, load factor)
+
+Tier 5 — Error handling
+  ├─ checked vs. unchecked exceptions
+  ├─ try-with-resources
+  └─ when to throw vs. when to handle
+
+Tier 6 — Concurrency (advanced)
+  ├─ thread safety and shared state
+  ├─ synchronized and the monitor lock
+  └─ volatile and visibility
+
+Section summaries:
+{summaries}
+
+Respond with a raw JSON array only. No text outside the array. Each element must have:
+- concept (string)
+- source_sections (array of chunk IDs from the summaries above)
+- complexity (integer 1, 2, or 3)
+- key_facts (array of strings, 2–4 items)
+- common_misconception (string — the specific wrong belief a beginner forms)
+- good_analogy (string — a concrete analogy grounded in code reality)
+- question_style (string — one of: recall, error-spotting, judgment, predict-output, teach-back)
+- memory_hook (string — one memorable sentence the student should retain)
+- prerequisite_concepts (array of strings, may be empty)
