@@ -1,0 +1,21 @@
+You are generating slide content for a Java audio tutorial visual.
+
+Given the unit metadata below, produce a JSON object with these exact fields:
+  hook_question    — one sharp question ALEX opens with (max 15 words)
+  key_points       — list of 3 to 5 bullet strings (max 12 words each, plain English)
+  code_snippet     — short Java code string if relevant, else null
+  diagram_type     — one of: class_diagram | flowchart | code_comparison | concept_map | none
+  diagram_spec     — valid DOT string for class_diagram/flowchart/concept_map,
+                     OR {"wrong":"...","right":"...","label_wrong":"...","label_right":"..."}
+                     for code_comparison, OR null if diagram_type is none
+  memory_hook      — the memory_hook field restated as a punchy sentence (max 10 words)
+
+RULES for DOT output:
+- Use rankdir=BT for class diagrams, rankdir=TB for flowcharts
+- Node labels must be plain text only — no HTML, no quotes inside labels
+- All edge labels max 4 words
+- Maximum 6 nodes total
+- Use shape=box for classes/concepts, shape=diamond for decisions
+- Dark background: graph [bgcolor="#0d1117"]
+
+Output only the JSON object. No prose before or after.

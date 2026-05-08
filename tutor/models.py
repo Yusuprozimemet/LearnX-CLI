@@ -76,3 +76,24 @@ class SessionLog:
     format: str
     duration_minutes: int
     exchanges: list[QAExchange] = field(default_factory=list)
+
+
+@dataclass
+class VisualSpec:
+    unit_index: int
+    slide_type: str            # "title_card" | "unit" | "outro"
+    concept: str = ""
+    hook_question: str = ""
+    key_points: list[str] = field(default_factory=list)
+    code_snippet: str | None = None
+    diagram_type: str = "none"
+    diagram_spec: object = None   # str (DOT) | dict | None
+    memory_hook: str = ""
+    analogy: str = ""
+    # title_card fields
+    title: str = ""
+    subtitle: str = ""
+    doc_source: str = ""
+    # outro fields
+    memory_hooks: list[str] = field(default_factory=list)
+    session_stats: str = ""

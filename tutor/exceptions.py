@@ -20,3 +20,7 @@ class PlayerError(TutorError):
 
 class ConfigError(TutorError):
     """Raised when required config (API key, ffmpeg) is missing."""
+
+
+class VideoError(TutorError):
+    """Raised when any step of the video pipeline fails."""
