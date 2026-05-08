@@ -9,6 +9,8 @@ from tutor.cli import theme
 
 log = logging.getLogger(__name__)
 
+AUDIO_DIR = Path("audio")
+
 
 @dataclass
 class ShellContext:
@@ -52,12 +54,38 @@ def _parse_generate_args(tokens: list[str]):
 
 
 def _apply_log_level(args) -> None:
-    """Apply --verbose / --debug to the live logger without re-running basicConfig."""
     import logging as _logging
     if getattr(args, "debug", False):
         _logging.getLogger().setLevel(_logging.DEBUG)
     elif getattr(args, "verbose", False):
         _logging.getLogger().setLevel(_logging.INFO)
+
+
+def _session_name(input_path: str) -> str:
+    """Derive a safe folder name from the input file path, e.g. week2/3.md → week2_3."""
+    return Path(input_path).with_suffix("").as_posix().replace("/", "_").replace("\\", "_").lstrip("_")
+
+
+def _resolve_units_dir(token: str) -> Path | None:
+    """Resolve a token to a tutorial_units directory.
+
+    Accepts:
+      - a session name  (e.g. "week2_3")  → audio/week2_3/tutorial_units/
+      - a direct path to tutorial_units/  → used as-is
+      - a path to any file inside audio/  → parent/tutorial_units/
+    """
+    p = Path(token)
+
+    # Direct path that exists
+    if p.exists():
+        return p if p.is_dir() else p.parent / "tutorial_units"
+
+    # Session name: look in audio/<name>/tutorial_units/
+    candidate = AUDIO_DIR / token / "tutorial_units"
+    if candidate.exists():
+        return candidate
+
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -68,7 +96,8 @@ def cmd_generate(tokens: list[str], ctx: ShellContext) -> None:
     """Usage: /generate <file.md> [--duration N] [--difficulty LEVEL]
               [--format FORMAT] [--topic TEXT] [--units N] [--no-cache]
               [--script-only] [--dry-run] [--provider groq|openrouter]
-              [--verbose] [--debug]"""
+              [--verbose] [--debug]
+    Output is saved to audio/<session>/ automatically."""
     if not tokens:
         print(theme.red("  Error: /generate requires a file path."))
         print(theme.dim("  Example: /generate notes.md --difficulty intermediate"))
@@ -81,6 +110,17 @@ def cmd_generate(tokens: list[str], ctx: ShellContext) -> None:
 
     _apply_log_level(args)
 
+    # Auto-route output into audio/<session>/ unless user specified --output
+    if not any(t.startswith("--output") for t in tokens) and args.input:
+        session = _session_name(args.input)
+        args.output = str(AUDIO_DIR / session / "tutorial.mp3")
+
+    # Ensure the output parent directory exists
+    if args.input and not getattr(args, "dry_run", False) \
+            and not getattr(args, "inspect", False) \
+            and not getattr(args, "script_only", False):
+        Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+
     from tutor import tutor as _tutor
     from tutor.exceptions import TutorError
     try:
@@ -90,7 +130,10 @@ def cmd_generate(tokens: list[str], ctx: ShellContext) -> None:
         if not getattr(args, "dry_run", False) \
                 and not getattr(args, "inspect", False) \
                 and not getattr(args, "script_only", False):
-            print(theme.green("\n  Generation complete. Type /play to start listening.\n"))
+            session = _session_name(args.input) if args.input else ""
+            print(theme.green(f"\n  Generation complete. Session: {theme.bold(session)}"))
+            print(theme.dim(f"  Saved to: {output.parent}/"))
+            print(theme.green("  Type /play to start listening.\n"))
     except TutorError as e:
         print(theme.red(f"\n  Error: {e}\n"))
     except Exception as e:
@@ -98,16 +141,46 @@ def cmd_generate(tokens: list[str], ctx: ShellContext) -> None:
         print(theme.red(f"\n  Unexpected error: {e}\n"))
 
 
+def cmd_sessions(tokens: list[str], ctx: ShellContext) -> None:
+    """Usage: /sessions — list all generated audio sessions in the audio/ folder"""
+    if not AUDIO_DIR.exists():
+        print(theme.dim("  No sessions yet. Use /generate to create one."))
+        return
+
+    sessions = sorted(
+        d for d in AUDIO_DIR.iterdir()
+        if d.is_dir() and (d / "tutorial_units").exists()
+    )
+    if not sessions:
+        print(theme.dim("  No sessions yet. Use /generate to create one."))
+        return
+
+    print()
+    for s in sessions:
+        units = list((s / "tutorial_units").glob("*.mp3"))
+        mp3 = s / "tutorial.mp3"
+        size = f"{mp3.stat().st_size // 1024} KB" if mp3.exists() else "—"
+        print(f"  {theme.cyan(s.name):<30} {len(units)} units   {size}")
+    print(theme.dim(f"\n  Play with: /play <session-name>"))
+    print()
+
+
 def cmd_play(tokens: list[str], ctx: ShellContext) -> None:
-    """Usage: /play [path-to-tutorial_units/] [--no-qa] [--provider groq|openrouter]"""
+    """Usage: /play [session-name | path] [--no-qa] [--provider groq|openrouter]
+    session-name: folder name under audio/ (see /sessions)"""
     # Resolve units_dir
-    unit_path = next((t for t in tokens if not t.startswith("--")), None)
-    if unit_path:
-        units_dir = Path(unit_path)
+    unit_token = next((t for t in tokens if not t.startswith("--")), None)
+    if unit_token:
+        units_dir = _resolve_units_dir(unit_token)
+        if units_dir is None:
+            print(theme.red(f"  Session '{unit_token}' not found."))
+            print(theme.dim("  Use /sessions to list available sessions."))
+            return
     elif ctx.last_units_dir and ctx.last_units_dir.exists():
         units_dir = ctx.last_units_dir
     else:
-        print(theme.red("  Error: no units directory known. Run /generate first, or pass a path."))
+        print(theme.red("  No session known. Run /generate first or pass a session name."))
+        print(theme.dim("  Use /sessions to list available sessions."))
         return
 
     # Resume if already paused
@@ -120,7 +193,7 @@ def cmd_play(tokens: list[str], ctx: ShellContext) -> None:
         print(theme.yellow("  Already playing. Use /pause, /next, /stop."))
         return
 
-    # Stop any existing stopped player
+    # Clear any finished player
     if ctx.player and ctx.player._state == "STOPPED":
         if ctx.player_thread:
             ctx.player_thread.join(timeout=1.0)
@@ -149,7 +222,7 @@ def cmd_play(tokens: list[str], ctx: ShellContext) -> None:
 
     ctx.player_thread = threading.Thread(target=_run, daemon=True, name="PlayerThread")
     ctx.player_thread.start()
-    print(theme.green(f"  Playing from {units_dir}"))
+    print(theme.green(f"  Playing: {units_dir}"))
     print(theme.dim("  Controls: /pause  /next  /prev  /stop  /ask  /summary"))
 
 
@@ -217,7 +290,7 @@ def cmd_ask(tokens: list[str], ctx: ShellContext) -> None:
     was_playing = ctx.player._state == "PLAYING"
     if was_playing:
         ctx.player._pause()
-        time.sleep(0.05)  # brief yield so player thread processes the pause
+        time.sleep(0.05)
 
     question = " ".join(tokens).strip() if tokens else None
     if not question:
@@ -340,8 +413,9 @@ def cmd_help(tokens: list[str], ctx: ShellContext) -> None:
     lines = f"""
 {theme.bold("Available commands")}
 
-  {theme.cyan("/generate")} <file.md> [flags]   Generate audio from a Markdown file
-  {theme.cyan("/play")} [path]                   Start or resume the player
+  {theme.cyan("/generate")} <file.md> [flags]   Generate audio → saved to audio/<session>/
+  {theme.cyan("/sessions")}                      List all generated sessions
+  {theme.cyan("/play")} [session | path]         Play a session (or resume if paused)
   {theme.cyan("/pause")}                         Pause playback
   {theme.cyan("/resume")}                        Resume playback
   {theme.cyan("/stop")}                          Stop and unload the player
@@ -367,13 +441,14 @@ def cmd_help(tokens: list[str], ctx: ShellContext) -> None:
   --no-cache            Clear cached summaries and regenerate
   --script-only         Print script; skip audio generation
   --dry-run             Preview curriculum; skip dialogue and audio
+  --verbose             Show per-step progress logs
+  --debug               Write DEBUG logs to tutor.log
 
 {theme.bold("Examples:")}
   /generate notes.md
-  /generate notes.md --difficulty intermediate --topic "HashMap internals"
-  /generate notes.md --format dual-tutor --duration 30
-  /play
-  /play tutorial_units/
+  /generate week2/3.md --difficulty intermediate --topic "HashMap internals"
+  /sessions
+  /play week2_3
   /ask what is the difference between == and .equals()?
   /dry-run notes.md --difficulty advanced
 """
@@ -387,6 +462,7 @@ def cmd_help(tokens: list[str], ctx: ShellContext) -> None:
 COMMAND_MAP: dict[str, object] = {
     "/generate": cmd_generate,
     "/gen":      cmd_generate,
+    "/sessions": cmd_sessions,
     "/play":     cmd_play,
     "/pause":    cmd_pause,
     "/resume":   cmd_resume,
