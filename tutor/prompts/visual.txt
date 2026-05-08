@@ -1,0 +1,60 @@
+You are generating slide content for a Java audio tutorial visual.
+
+Given the unit metadata below, produce a JSON object with these exact fields:
+  hook_question    — one sharp question ALEX opens with (max 15 words)
+  key_points       — list of 3 to 5 bullet strings (max 12 words each, plain English)
+  code_snippet     — short Java code string if relevant, else null
+  diagram_type     — one of: class_diagram | flowchart | code_comparison | concept_map | none
+  diagram_spec     — see below
+  memory_hook      — the memory_hook field restated as a punchy sentence (max 10 words)
+
+DIAGRAM_SPEC VALUE RULES:
+
+For class_diagram, flowchart, or concept_map:
+  diagram_spec must be a JSON STRING containing valid Graphviz DOT code.
+  Do NOT make it a JSON object. It is a plain string.
+
+For code_comparison:
+  diagram_spec must be a JSON object with keys: wrong, right, label_wrong, label_right
+
+For none:
+  diagram_spec must be null
+
+COMPLETE OUTPUT EXAMPLE (concept_map):
+
+{
+  "hook_question": "Interface or abstract class — which fits?",
+  "key_points": [
+    "Interface defines a contract",
+    "Abstract class adds shared state",
+    "Use interface for multiple inheritance"
+  ],
+  "code_snippet": null,
+  "diagram_type": "concept_map",
+  "diagram_spec": "graph G {\n  layout=neato\n  graph [bgcolor=\"#0d1117\"]\n  node [style=\"filled,rounded\" fillcolor=\"#161b22\" color=\"#30363d\" fontcolor=\"#e6edf3\" fontsize=13 shape=box]\n  edge [color=\"#8b949e\" fontcolor=\"#8b949e\" fontsize=10]\n  Interface [label=\"Interface\" fontsize=16 color=\"#00b4d8\"]\n  Abstract [label=\"Abstract Class\"]\n  Interface -- Abstract [label=\"vs\"]\n}",
+  "memory_hook": "Interface = contract, abstract class = blueprint."
+}
+
+COMPLETE OUTPUT EXAMPLE (flowchart):
+
+{
+  "hook_question": "Does == compare value or reference?",
+  "key_points": [
+    "== compares object references",
+    ".equals() compares content",
+    "Always use .equals() for strings"
+  ],
+  "code_snippet": "s1.equals(s2)",
+  "diagram_type": "flowchart",
+  "diagram_spec": "digraph G {\n  rankdir=TB\n  graph [bgcolor=\"#0d1117\"]\n  node [style=filled fillcolor=\"#161b22\" color=\"#30363d\" fontcolor=\"#e6edf3\" fontsize=13]\n  edge [color=\"#8b949e\" fontcolor=\"#8b949e\" fontsize=11]\n  start [label=\"Compare strings\" shape=oval color=\"#00b4d8\" fillcolor=\"#1a1a2e\"]\n  decide [label=\"Same object?\" shape=diamond color=\"#e3b341\" fillcolor=\"#2a1a0d\"]\n  yes [label=\"== is true\" shape=box color=\"#3fb950\" fillcolor=\"#0d2a1a\"]\n  no [label=\"Use .equals()\" shape=box]\n  start -> decide\n  decide -> yes [label=\"yes\"]\n  decide -> no [label=\"no\"]\n}",
+  "memory_hook": "Strings need .equals(), not ==."
+}
+
+CRITICAL RULES for the DOT string:
+- It is a JSON string value — write it as a single string with \n for newlines
+- It MUST start with digraph or graph and contain { ... }
+- Statements separated by newlines (\n), never semicolons
+- Maximum 6 nodes
+- Node labels: plain text only, no unescaped quotes inside the string
+
+Output only the JSON object. No prose, no markdown fences before or after.

@@ -13,12 +13,14 @@ curriculum = "llama-3.3-70b-versatile"
 dialogue   = "llama-3.1-8b-instant"
 summarize  = "llama-3.1-8b-instant"
 qa         = "llama-3.1-8b-instant"
+visual     = "llama-3.3-70b-versatile"    # 70b needed for reliable DOT output
 
 [providers.openrouter]
 curriculum = "google/gemma-3-27b-it:free"
 dialogue   = "meta-llama/llama-3.1-8b-instruct:free"
 summarize  = "meta-llama/llama-3.1-8b-instruct:free"
 qa         = "meta-llama/llama-3.1-8b-instruct:free"
+visual     = "google/gemma-3-27b-it:free"
 
 # ── Response token caps ──────────────────────────────────────
 # Max tokens the model may generate per call type.
@@ -30,6 +32,7 @@ curriculum = 2000
 dialogue   = 1500
 summarize  = 400
 qa         = 600
+visual     = 1200
 
 # ── Input size limits ────────────────────────────────────────
 # max_source_tokens:          source text sent with each dialogue prompt
@@ -42,6 +45,7 @@ qa         = 600
 [limits]
 max_source_tokens          = 1500
 max_summarize_input_tokens = 3000
+max_visual_source_tokens   = 800
 
 # ── Call behaviour ───────────────────────────────────────────
 

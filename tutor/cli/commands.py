@@ -17,6 +17,8 @@ class ShellContext:
     player: object = None                          # TutorPlayer | None
     player_thread: threading.Thread | None = None
     last_units_dir: Path | None = None
+    current_session: str | None = None
+    last_video: Path | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -131,6 +133,7 @@ def cmd_generate(tokens: list[str], ctx: ShellContext) -> None:
                 and not getattr(args, "inspect", False) \
                 and not getattr(args, "script_only", False):
             session = _session_name(args.input) if args.input else ""
+            ctx.current_session = session
             print(theme.green(f"\n  Generation complete. Session: {theme.bold(session)}"))
             print(theme.dim(f"  Saved to: {output.parent}/"))
             print(theme.green("  Type /play to start listening.\n"))
@@ -143,6 +146,8 @@ def cmd_generate(tokens: list[str], ctx: ShellContext) -> None:
 
 def cmd_sessions(tokens: list[str], ctx: ShellContext) -> None:
     """Usage: /sessions — list all generated audio sessions in the audio/ folder"""
+    from tutor.cli.video_commands import VIDEO_DIR
+
     if not AUDIO_DIR.exists():
         print(theme.dim("  No sessions yet. Use /generate to create one."))
         return
@@ -160,8 +165,11 @@ def cmd_sessions(tokens: list[str], ctx: ShellContext) -> None:
         units = list((s / "tutorial_units").glob("*.mp3"))
         mp3 = s / "tutorial.mp3"
         size = f"{mp3.stat().st_size // 1024} KB" if mp3.exists() else "—"
-        print(f"  {theme.cyan(s.name):<30} {len(units)} units   {size}")
+        has_mp4 = (VIDEO_DIR / s.name / "full_session.mp4").exists()
+        badge   = theme.green("  [mp4]") if has_mp4 else ""
+        print(f"  {theme.cyan(s.name):<30} {len(units)} units   {size}{badge}")
     print(theme.dim(f"\n  Play with: /play <session-name>"))
+    print(theme.dim("  Generate video: /video <session-name>"))
     print()
 
 
@@ -427,6 +435,8 @@ def cmd_help(tokens: list[str], ctx: ShellContext) -> None:
   {theme.cyan("/status")}                        Show player state, unit, time, Q&A count
   {theme.cyan("/inspect")} <file.md>             Show ingestion report (no LLM calls)
   {theme.cyan("/dry-run")} <file.md> [flags]     Preview curriculum without generating audio
+  {theme.cyan("/video")} [session]               Generate MP4 video (needs /generate first)
+  {theme.cyan("/vsessions")}                     List sessions that have a completed video
   {theme.cyan("/clear")}                         Clear the terminal
   {theme.cyan("/help")} [command]                Show this help or detail for one command
   {theme.cyan("/quit")}                          Exit LearnX
