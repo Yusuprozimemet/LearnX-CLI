@@ -2,15 +2,10 @@ import argparse
 import asyncio
 import io
 import logging
+import shutil
 import sys
 from functools import partial
 from pathlib import Path
-
-# Force UTF-8 output on Windows so LLM-generated unicode (≠, →, etc.) doesn't crash
-if hasattr(sys.stdout, "buffer"):
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-if hasattr(sys.stderr, "buffer"):
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 from tutor.config import preflight
 from tutor.constants import (
@@ -30,6 +25,13 @@ from tutor.models import DialogueLine, TeachingUnit
 
 
 def main() -> None:
+    # Force UTF-8 output on Windows so LLM-generated unicode (≠, →, etc.) doesn't crash.
+    # Done here (not at module level) so pytest's stdout capture isn't affected.
+    if hasattr(sys.stdout, "buffer"):
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "buffer"):
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+
     # Detect "play" subcommand before building the main parser — argparse
     # cannot handle a positional that is either a subcommand or a file path.
     if len(sys.argv) > 1 and sys.argv[1] == "play":
@@ -82,6 +84,12 @@ def cmd_generate(args) -> None:
     config = preflight(args.input, args.provider, mode)
     llm_fn = partial(llm.chat, provider=args.provider, config=config)
 
+    if args.no_cache:
+        cache_dir = Path(".tutor_cache")
+        if cache_dir.exists():
+            shutil.rmtree(cache_dir)
+            print("Cache cleared (all summaries and dialogues will be regenerated).")
+
     profile = doc_analyzer.analyze(args.input)
     text = Path(args.input).read_text(encoding="utf-8")
     chunks = chunker.chunk(text, profile)
@@ -104,7 +112,7 @@ def cmd_generate(args) -> None:
         inspector.report_curriculum(units, chunks, args.duration)
         return
 
-    all_lines = [dialogue.generate(u, chunks, args.fmt, llm_fn) for u in units]
+    all_lines = [dialogue.generate(u, chunks, args.fmt, llm_fn, args.difficulty) for u in units]
     doc_title = Path(args.input).stem.replace("-", " ").replace("_", " ").title()
     script = assembler.assemble(units, all_lines, args.fmt, doc_title)
     _print_duration_estimate(script)

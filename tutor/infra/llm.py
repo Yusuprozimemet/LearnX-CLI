@@ -7,7 +7,7 @@ from pathlib import Path
 from openai import OpenAI
 
 from tutor.config import Config
-from tutor.exceptions import LLMError
+from tutor.exceptions import ConfigError, LLMError
 
 log = logging.getLogger(__name__)
 
@@ -25,17 +25,24 @@ MODEL_MAP = {
 
 def _build_client(provider: str, config: Config) -> OpenAI:
     if provider == "groq":
+        if not config.groq_api_key:
+            raise ConfigError("GROQ_API_KEY not set. Add it to tutor/.env")
         return OpenAI(
             api_key=config.groq_api_key,
             base_url="https://api.groq.com/openai/v1",
         )
     if provider == "openrouter":
+        if not config.openrouter_api_key:
+            raise ConfigError(
+                "OPENROUTER_API_KEY not set.\n"
+                "  Get a free key at openrouter.ai and add OPENROUTER_API_KEY to tutor/.env"
+            )
         return OpenAI(
             api_key=config.openrouter_api_key,
             base_url="https://openrouter.ai/api/v1",
             default_headers={"HTTP-Referer": "http://localhost"},
         )
-    raise LLMError(f"Unknown provider: {provider}")
+    raise ConfigError(f"Unknown provider: {provider!r}. Use 'groq' or 'openrouter'.")
 
 
 def chat(
@@ -63,13 +70,15 @@ def chat(
             return content
         except Exception as e:
             status = getattr(e, "status_code", None)
-            if attempt == 0 and status in (429, 503, None):
+            if status in (400, 401, 403):
+                raise LLMError(f"Auth/request error ({status}): {e}") from e
+            if attempt == 0:
                 log.warning("LLM call failed (%s), retrying in 2s...", e)
                 time.sleep(2)
                 continue
-            raise LLMError(str(e)) from e
+            raise LLMError(f"LLM call failed after retry: {e}") from e
 
-    raise LLMError("LLM call failed after retry")
+    raise LLMError("Unreachable")
 
 
 def parse_json_response(raw: str) -> object:

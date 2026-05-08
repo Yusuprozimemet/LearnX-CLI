@@ -1,7 +1,12 @@
 import logging
 import re
 
-from tutor.constants import MAX_CHUNK_TOKENS, MIN_CHUNK_TOKENS
+from tutor.constants import (
+    MAX_CHUNK_TOKENS,
+    MIN_CHUNK_TOKENS,
+    STRATEGY_C_OVERLAP_TOKENS,
+    STRATEGY_C_WINDOW_TOKENS,
+)
 from tutor.exceptions import IngestionError
 from tutor.ingestion import parse_content
 from tutor.models import Chunk, DocProfile
@@ -17,6 +22,9 @@ def chunk(text: str, profile: DocProfile) -> list[Chunk]:
     else:
         chunks = _strategy_c(text)
     return _apply_quality_rules(chunks)
+
+
+
 
 
 def _slugify(heading: str) -> str:
@@ -46,7 +54,7 @@ def _strategy_b(text: str) -> list[Chunk]:
 
     if len(sections) < 2:
         log.warning(
-            "Document has no headings — falling back to sliding window chunking. "
+            "Document has no headings — falling back to Strategy C (sliding window). "
             "Consider adding ## headings to improve chunk quality."
         )
         return _strategy_c(text)
@@ -109,11 +117,44 @@ def _split_section(section: str, heading: str, parent_heading: str | None) -> li
 
 
 def _strategy_c(text: str) -> list[Chunk]:
-    raise NotImplementedError(
-        "Strategy C (sliding window) — implement on Day 3.\n"
-        "This document is too large for current ingestion strategies. "
-        "Add ## headings to enable Strategy B, or use a smaller document."
-    )
+    word_window = int(STRATEGY_C_WINDOW_TOKENS / 1.3)
+    word_overlap = int(STRATEGY_C_OVERLAP_TOKENS / 1.3)
+
+    words = text.split()
+    chunks: list[Chunk] = []
+    start = 0
+    idx = 0
+
+    while start < len(words):
+        end = min(start + word_window, len(words))
+        window_words = words[start:end]
+
+        if end < len(words):
+            window_text = " ".join(window_words)
+            last_period = window_text.rfind(". ")
+            if last_period > len(window_text) // 2:
+                window_text = window_text[: last_period + 1]
+                window_words = window_text.split()
+
+        chunk_text = " ".join(window_words)
+        token_count = int(len(window_words) * 1.3)
+
+        chunks.append(Chunk(
+            chunk_id=f"window_{idx:03d}",
+            breadcrumb=f"Window {idx + 1}",
+            heading=f"Window {idx + 1}",
+            level=0,
+            token_count=token_count,
+            text=chunk_text,
+            has_code=False,
+            overlapping=(idx > 0),
+        ))
+
+        idx += 1
+        step = word_window - word_overlap
+        start += max(step, 1)
+
+    return chunks
 
 
 def _apply_quality_rules(chunks: list[Chunk]) -> list[Chunk]:

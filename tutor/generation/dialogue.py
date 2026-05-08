@@ -4,7 +4,7 @@ import logging
 import re
 from pathlib import Path
 
-from tutor.constants import PROMPT_VERSION, SUMMARY_CACHE_DIR
+from tutor.constants import MAX_SOURCE_TOKENS, PROMPT_VERSION, SUMMARY_CACHE_DIR
 from tutor.exceptions import LLMError
 from tutor.infra.llm import load_prompt, parse_json_response
 from tutor.models import Chunk, DialogueLine, TeachingUnit
@@ -17,10 +17,11 @@ def generate(
     source_chunks: list[Chunk],
     fmt: str,
     llm_fn,
+    difficulty: str = "beginner",
     cache_dir: str = SUMMARY_CACHE_DIR,
 ) -> list[DialogueLine]:
     cache_key = hashlib.md5(
-        (unit.concept + str(unit.word_budget) + fmt + PROMPT_VERSION).encode()
+        (unit.concept + str(unit.word_budget) + fmt + difficulty + PROMPT_VERSION).encode()
     ).hexdigest()
     cache_file = Path(cache_dir) / f"{cache_key}.dialogue.json"
 
@@ -33,6 +34,7 @@ def generate(
     if not relevant:
         relevant = source_chunks[:2]
     source_text = "\n\n".join(f"## {c.heading}\n{c.text}" for c in relevant)
+    source_text = _truncate_source(source_text, MAX_SOURCE_TOKENS)
 
     unit_json = json.dumps({
         "concept": unit.concept,
@@ -75,6 +77,15 @@ def generate(
     )
 
     return lines
+
+
+def _truncate_source(text: str, max_tokens: int) -> str:
+    words = text.split()
+    max_words = int(max_tokens / 1.3)
+    if len(words) <= max_words:
+        return text
+    log.warning("Source text truncated from %d to %d words for context limit", len(words), max_words)
+    return " ".join(words[:max_words])
 
 
 def _parse_dialogue_line(raw_line: str, unit_number: int) -> DialogueLine | None:

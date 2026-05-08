@@ -1,17 +1,17 @@
 import logging
 
-from tutor.constants import OVERHEAD_WORDS, WPM
+from tutor.constants import (
+    DIFFICULTY_CONTEXT,
+    DIFFICULTY_MULTIPLIERS,
+    OVERHEAD_WORDS,
+    WORDS_PER_COMPLEXITY,
+    WPM,
+)
 from tutor.exceptions import LLMError
 from tutor.infra.llm import load_prompt, parse_json_response
 from tutor.models import Chunk, DocProfile, TeachingUnit
 
 log = logging.getLogger(__name__)
-
-_DIFFICULTY_CONTEXT = {
-    "beginner": "The student has never written Java before. Use more scaffolding and mandatory analogies.",
-    "intermediate": "The student has written Java for 3 months. Assume JVM basics are known.",
-    "advanced": "The student knows OOP basics but makes design-level mistakes. Focus on contracts and concurrency.",
-}
 
 
 def plan(
@@ -22,7 +22,7 @@ def plan(
     difficulty: str = "beginner",
 ) -> list[TeachingUnit]:
     summaries = "\n".join(f"[{c.chunk_id}] {c.summary}" for c in chunks)
-    difficulty_context = _DIFFICULTY_CONTEXT.get(difficulty, _DIFFICULTY_CONTEXT["beginner"])
+    difficulty_context = DIFFICULTY_CONTEXT.get(difficulty, DIFFICULTY_CONTEXT["beginner"])
 
     prompt = load_prompt("curriculum.txt").format(
         doc_title=profile.filepath,
@@ -53,12 +53,16 @@ def plan(
     total_complexity = sum(int(u.get("complexity", 2)) for u in data)
     if total_complexity == 0:
         total_complexity = len(data)
+    multiplier = DIFFICULTY_MULTIPLIERS.get(difficulty, 1.0)
     base = total_budget / total_complexity
 
     units: list[TeachingUnit] = []
     for i, u in enumerate(data):
         complexity = max(1, min(3, int(u.get("complexity", 2))))
-        word_budget = round(base * complexity)
+        word_budget = max(
+            round(base * complexity * multiplier),
+            WORDS_PER_COMPLEXITY[1],  # floor: min 200 words even for advanced
+        )
         units.append(
             TeachingUnit(
                 unit=i + 1,
