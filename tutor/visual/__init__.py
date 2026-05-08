@@ -4,11 +4,14 @@ Reads from audio/<session>/, writes to video/<session>/.
 """
 import json
 import logging
+import re
 import subprocess
 from pathlib import Path
 from typing import Callable
 
 from tutor.models import DialogueLine
+
+_UNIT_MP3_RE = re.compile(r"^unit_\d+$")   # matches unit_01, unit_02 — not unit_00_intro
 
 log = logging.getLogger(__name__)
 
@@ -35,7 +38,10 @@ def run_visual_pipeline(
 
     units_json = audio_dir / "tutorial.units.json"
     doc_title  = _doc_title_from_units(units_json)
-    unit_mp3s  = sorted((audio_dir / "tutorial_units").glob("unit_*.mp3"))
+    unit_mp3s  = sorted(
+        p for p in (audio_dir / "tutorial_units").glob("unit_*.mp3")
+        if _UNIT_MP3_RE.match(p.stem)
+    )
     slides_dir = video_dir / "slides"
     slides_dir.mkdir(parents=True, exist_ok=True)
 
@@ -81,17 +87,47 @@ def _doc_title_from_units(units_json: Path) -> str:
 
 
 def _load_all_lines(units_json: Path) -> list[DialogueLine]:
-    """Load dialogue lines from the units JSON if a script field is present."""
+    """
+    Load dialogue lines. Tries units JSON `lines` field first;
+    falls back to parsing tutorial.script.txt in the same directory.
+    """
+    import re as _re
     try:
         units = json.loads(units_json.read_text(encoding="utf-8"))
         lines: list[DialogueLine] = []
         for u in units:
             for raw in u.get("lines", []):
                 lines.append(DialogueLine(**raw))
-        return lines
+        if lines:
+            return lines
     except Exception:
-        log.warning("Could not load dialogue lines from %s", units_json)
+        pass
+
+    # Fallback: parse tutorial.script.txt
+    script_path = units_json.parent / "tutorial.script.txt"
+    if not script_path.exists():
+        log.warning("No dialogue lines source found — subtitles will be empty")
         return []
+
+    try:
+        n_units = len(json.loads(units_json.read_text(encoding="utf-8")))
+    except Exception:
+        n_units = 1
+
+    raw_lines = [l.strip() for l in script_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    speaker_re = _re.compile(r"^(ALEX|MAYA|SAM):\s*(.+)$")
+    valid = [(m.group(1), m.group(2)) for l in raw_lines if (m := speaker_re.match(l))]
+
+    if not valid:
+        return []
+
+    # Distribute lines evenly across units (rough heuristic)
+    per_unit = max(1, len(valid) // max(n_units, 1))
+    result: list[DialogueLine] = []
+    for i, (speaker, text) in enumerate(valid):
+        unit_num = min(i // per_unit + 1, n_units)
+        result.append(DialogueLine(speaker=speaker, text=text, unit_number=unit_num))
+    return result
 
 
 def _mp3_duration(path: Path) -> float:

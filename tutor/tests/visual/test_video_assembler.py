@@ -22,7 +22,9 @@ def test_concat_script_written_correctly(tmp_path):
     assert "duration 38.440" in content
     # Last file appears twice (no duration on second appearance)
     lines = content.strip().splitlines()
-    assert lines[-1] == f"file '{entries[-1][0]}'"
+    # Path is normalised to forward slashes in the concat script
+    expected_path = str(entries[-1][0].resolve()).replace("\\", "/")
+    assert lines[-1] == f"file '{expected_path}'"
     assert "duration" not in lines[-1]
 
 

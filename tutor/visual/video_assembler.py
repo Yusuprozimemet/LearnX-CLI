@@ -79,14 +79,18 @@ def assemble_session(
     nosub = session_dir / "full_session_nosub.mp4"
     _concat_unit_videos(unit_mp4s, nosub)
 
-    # Embed subtitles
+    # Embed subtitles (skip if SRT is empty)
     step += 1
     print(f"  [{step}/{total_steps}] Embedding subtitles...")
     final = session_dir / "full_session.mp4"
-    _embed_subtitles(nosub, srt_path, final)
+    if srt_path.exists() and srt_path.stat().st_size > 20:
+        _embed_subtitles(nosub, srt_path, final)
+    else:
+        log.warning("SRT is empty — copying video without subtitle track")
+        nosub.rename(final)
 
     size_mb = final.stat().st_size / 1_048_576
-    print(f"  ✓  {final}  ({size_mb:.0f} MB)")
+    print(f"  OK  {final}  ({size_mb:.0f} MB)")
     return final
 
 
@@ -184,11 +188,13 @@ def _normalize_audio(video: Path, output: Path) -> Path:
 def _write_concat_script(entries: list[tuple[Path, float]], script_path: Path) -> None:
     lines = ["ffconcat version 1.0"]
     for path, dur in entries:
-        lines.append(f"file '{path}'")
+        abs_path = str(path.resolve()).replace("\\", "/")
+        lines.append(f"file '{abs_path}'")
         lines.append(f"duration {dur:.3f}")
     # Repeat last file without duration (ffmpeg concat requirement)
     if entries:
-        lines.append(f"file '{entries[-1][0]}'")
+        abs_last = str(entries[-1][0].resolve()).replace("\\", "/")
+        lines.append(f"file '{abs_last}'")
     script_path.write_text("\n".join(lines), encoding="utf-8")
 
 
