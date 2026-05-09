@@ -24,7 +24,7 @@ from tutor.constants import (
     WPM,
 )
 from tutor.exceptions import TutorError
-from tutor.generation import assembler, curriculum, dialogue
+from tutor.generation import assembler, curriculum, dialogue, narrator
 from tutor.infra import llm
 from tutor.ingestion import chunker, doc_analyzer, summarizer
 from tutor.models import Chunk, DialogueLine, DocProfile, TeachingUnit
@@ -62,6 +62,15 @@ def main() -> None:
     parser.add_argument("--no-cache", action="store_true", dest="no_cache")
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--debug", action="store_true")
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument(
+        "--explain",
+        action="store_true",
+        help="Narrate the document top-to-bottom (read-along mode)",
+    )
+    mode_group.add_argument(
+        "--conversation", action="store_true", help="Concept-driven dialogue (default)"
+    )
 
     args = parser.parse_args()
     _setup_logging(args)
@@ -90,8 +99,8 @@ def _run_play() -> None:
 
 
 def cmd_generate(args: argparse.Namespace) -> None:
-    mode = _mode(args)
-    config = preflight(args.input, args.provider, mode)
+    pipeline_mode = _mode(args)
+    config = preflight(args.input, args.provider, pipeline_mode)
     llm_fn = partial(llm.chat, provider=args.provider, config=config)
 
     if args.no_cache:
@@ -103,10 +112,6 @@ def cmd_generate(args: argparse.Namespace) -> None:
     profile = doc_analyzer.analyze(args.input)
     chunks = chunker.chunk(Path(args.input).read_text(encoding="utf-8"), profile)
 
-    if not args.inspect:
-        chunks = summarizer.summarize_all(chunks, llm_fn)
-        _save_chunks(chunks, args.output)
-
     if args.inspect:
         _run_inspect(args, profile, chunks)
         return
@@ -114,17 +119,28 @@ def cmd_generate(args: argparse.Namespace) -> None:
     if args.subject not in ("java", "general"):
         print(f"Warning: --subject {args.subject!r} is not supported yet; proceeding as 'general'.")
 
-    units = curriculum.plan(chunks, profile, args.duration, llm_fn, args.difficulty, args.topic)
-    if args.units:
-        units = units[: args.units]
-
-    if args.dry_run:
-        inspector.report_curriculum(units, chunks, args.duration)
-        return
-
-    all_lines = [dialogue.generate(u, chunks, args.fmt, llm_fn, args.difficulty) for u in units]
     doc_title = Path(args.input).stem.replace("-", " ").replace("_", " ").title()
-    script = assembler.assemble(units, all_lines, args.fmt, doc_title)
+    is_explain = getattr(args, "explain", False)
+
+    if is_explain:
+        _save_chunks(chunks, args.output)
+        units, all_lines = narrator.narrate_all(chunks, doc_title, llm_fn)
+        script = assembler.assemble(units, all_lines, "explain", doc_title, mode="explain")
+    else:
+        chunks = summarizer.summarize_all(chunks, llm_fn)
+        _save_chunks(chunks, args.output)
+
+        units = curriculum.plan(chunks, profile, args.duration, llm_fn, args.difficulty, args.topic)
+        if args.units:
+            units = units[: args.units]
+
+        if args.dry_run:
+            inspector.report_curriculum(units, chunks, args.duration)
+            return
+
+        all_lines = [dialogue.generate(u, chunks, args.fmt, llm_fn, args.difficulty) for u in units]
+        script = assembler.assemble(units, all_lines, args.fmt, doc_title)
+
     _print_duration_estimate(script)
 
     if args.script_only:
@@ -220,6 +236,8 @@ def _build_player(args: argparse.Namespace) -> "TutorPlayer":
             raw_units = json.load(f)
         for u in raw_units:
             u.setdefault("prerequisite_concepts", [])
+            u.setdefault("js_contrast", "")
+            u.setdefault("production_relevance", "")
         units = [TeachingUnit(**u) for u in raw_units]
     else:
         units = [
@@ -295,6 +313,9 @@ def _make_generate_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-cache", action="store_true", dest="no_cache")
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--debug", action="store_true")
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument("--explain", action="store_true")
+    mode_group.add_argument("--conversation", action="store_true")
     return parser
 
 
@@ -305,7 +326,7 @@ def _mode(args: argparse.Namespace) -> str:
         return "dry-run"
     if getattr(args, "script_only", False):
         return "script-only"
-    return "generate"  # triggers ffmpeg check in preflight
+    return "generate"
 
 
 def _print_duration_estimate(script: list[DialogueLine]) -> None:

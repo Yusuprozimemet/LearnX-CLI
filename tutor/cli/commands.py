@@ -131,6 +131,8 @@ def cmd_generate(tokens: list[str], ctx: ShellContext) -> None:
     # Auto-route output into audio/<session>/ unless user specified --output
     if not any(t.startswith("--output") for t in tokens) and args.input:
         session = _session_name(args.input)
+        if getattr(args, "explain", False):
+            session = session + "_explain"
         args.output = str(AUDIO_DIR / session / "tutorial.mp3")
 
     # Ensure the output parent directory exists
@@ -155,6 +157,8 @@ def cmd_generate(tokens: list[str], ctx: ShellContext) -> None:
             and not getattr(args, "script_only", False)
         ):
             session = _session_name(args.input) if args.input else ""
+            if getattr(args, "explain", False):
+                session = session + "_explain"
             ctx.current_session = session
             # Write source metadata so the visual pipeline can find the doc title
             if args.input:
@@ -515,13 +519,15 @@ def cmd_help(tokens: list[str], ctx: ShellContext) -> None:
   {theme.cyan("/dry-run")} <file.md> [flags]     Preview curriculum plan; skip dialogue and audio
 
   {theme.bold("/generate flags:")}
-    --duration N          Target length in minutes         (default: 20)
-    --difficulty LEVEL    beginner | intermediate | advanced (default: beginner)
-    --format FORMAT       tutor-student | dual-tutor        (default: tutor-student)
-    --topic TEXT          Force a specific concept into the curriculum
-    --units N             Cap the number of teaching units
+    --explain             Read-along mode: narrate document top-to-bottom (one unit per section)
+    --conversation        Concept-driven dialogue mode (default — can be omitted)
+    --duration N          Target length in minutes         (default: 20, conversation only)
+    --difficulty LEVEL    beginner | intermediate | advanced (default: beginner, conversation only)
+    --format FORMAT       tutor-student | dual-tutor        (default: tutor-student, conversation only)
+    --topic TEXT          Force a specific concept into the curriculum (conversation only)
+    --units N             Cap the number of teaching units  (conversation only)
     --provider NAME       groq | openrouter                 (default: groq)
-    --no-cache            Ignore cached summaries and regenerate
+    --no-cache            Ignore cached narrations/dialogues and regenerate
     --script-only         Print script only; skip audio synthesis
     --verbose             Show per-step progress logs
     --debug               Write DEBUG logs to tutor.log
@@ -554,7 +560,14 @@ def cmd_help(tokens: list[str], ctx: ShellContext) -> None:
 
 {theme.bold("─── EXAMPLES ────────────────────────────────────────────────────────────────")}
 
-  {theme.bold("Audio workflow:")}
+  {theme.bold("Read-along (explain) workflow:")}
+    /generate week2/2.md --explain
+    /play week2_2_explain
+    /next
+    /ask what does super() do here?
+    /stop
+
+  {theme.bold("Conversation workflow:")}
     /generate week2/3.md
     /generate week2/3.md --difficulty intermediate --topic "HashMap internals"
     /dry-run notes.md --difficulty advanced
