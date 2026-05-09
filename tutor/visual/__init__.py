@@ -77,6 +77,38 @@ def run_visual_pipeline(
 
 
 def _doc_title_from_units(units_json: Path) -> str:
+    """
+    Priority: H1 from source markdown → source filename stem → first unit concept.
+    Reads tutorial.meta.json (written by /generate) for the source file path.
+    """
+    import re as _re
+    meta_path = units_json.parent / "tutorial.meta.json"
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            src = Path(meta.get("source_file", ""))
+            if src.exists():
+                text = src.read_text(encoding="utf-8", errors="replace")
+                # Try H1 first, then first H2 that isn't boilerplate
+                _SKIP = {"learning objectives", "introduction", "overview", "contents"}
+                for pat in (r"^#\s+(.+)$", r"^##\s+(.+)$"):
+                    for m in _re.finditer(pat, text, _re.MULTILINE):
+                        raw = m.group(1).strip()
+                        # strip leading "1. " / "1) " style numbering
+                        raw = _re.sub(r"^\d+[.)]\s*", "", raw)
+                        # strip emoji and punctuation, keep words/hyphens
+                        candidate = _re.sub(r"[^\w\s\-&]", "", raw).strip()
+                        if candidate.lower() not in _SKIP and len(candidate) > 3:
+                            return candidate
+            # Format the path: week2/3.md → "Week 2 - Part 3"
+            if src.stem:
+                stem = src.stem.replace("_", " ").replace("-", " ")
+                parent = src.parent.name.replace("_", " ").replace("-", " ")
+                if stem.isdigit() and parent:
+                    return f"{parent.title()} - Part {stem}"
+                return stem.title()
+        except Exception:
+            pass
     try:
         units = json.loads(units_json.read_text(encoding="utf-8"))
         if units:

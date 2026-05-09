@@ -134,6 +134,13 @@ def cmd_generate(tokens: list[str], ctx: ShellContext) -> None:
                 and not getattr(args, "script_only", False):
             session = _session_name(args.input) if args.input else ""
             ctx.current_session = session
+            # Write source metadata so the visual pipeline can find the doc title
+            if args.input:
+                import json as _json
+                meta = {"source_file": str(args.input)}
+                (output.parent / "tutorial.meta.json").write_text(
+                    _json.dumps(meta, ensure_ascii=False), encoding="utf-8"
+                )
             print(theme.green(f"\n  Generation complete. Session: {theme.bold(session)}"))
             print(theme.dim(f"  Saved to: {output.parent}/"))
             print(theme.green("  Type /play to start listening.\n"))
@@ -419,48 +426,72 @@ def cmd_help(tokens: list[str], ctx: ShellContext) -> None:
         return
 
     lines = f"""
-{theme.bold("Available commands")}
+{theme.bold("─── AUDIO PIPELINE ─────────────────────────────────────────────────────────")}
 
-  {theme.cyan("/generate")} <file.md> [flags]   Generate audio → saved to audio/<session>/
-  {theme.cyan("/sessions")}                      List all generated sessions
-  {theme.cyan("/play")} [session | path]         Play a session (or resume if paused)
+  {theme.cyan("/generate")} <file.md> [flags]   Parse notes → generate dialogue → synthesise MP3s
+  {theme.cyan("/sessions")}                      List all audio sessions in audio/
+  {theme.cyan("/inspect")} <file.md>             Show ingestion report without running anything
+  {theme.cyan("/dry-run")} <file.md> [flags]     Preview curriculum plan; skip dialogue and audio
+
+  {theme.bold("/generate flags:")}
+    --duration N          Target length in minutes         (default: 20)
+    --difficulty LEVEL    beginner | intermediate | advanced (default: beginner)
+    --format FORMAT       tutor-student | dual-tutor        (default: tutor-student)
+    --topic TEXT          Force a specific concept into the curriculum
+    --units N             Cap the number of teaching units
+    --provider NAME       groq | openrouter                 (default: groq)
+    --no-cache            Ignore cached summaries and regenerate
+    --script-only         Print script only; skip audio synthesis
+    --verbose             Show per-step progress logs
+    --debug               Write DEBUG logs to tutor.log
+
+{theme.bold("─── AUDIO PLAYBACK ──────────────────────────────────────────────────────────")}
+
+  {theme.cyan("/play")} [session | path]         Load and play a session (MP3 units)
   {theme.cyan("/pause")}                         Pause playback
-  {theme.cyan("/resume")}                        Resume playback
+  {theme.cyan("/resume")}                        Resume from pause
   {theme.cyan("/stop")}                          Stop and unload the player
-  {theme.cyan("/next")}                          Jump to next unit
-  {theme.cyan("/prev")}                          Jump to previous unit
-  {theme.cyan("/replay")}                        Replay current unit from the start
-  {theme.cyan("/ask")} [question]                Ask a question about the current unit
-  {theme.cyan("/summary")}                       Print unit summary and memory hook
-  {theme.cyan("/status")}                        Show player state, unit, time, Q&A count
-  {theme.cyan("/inspect")} <file.md>             Show ingestion report (no LLM calls)
-  {theme.cyan("/dry-run")} <file.md> [flags]     Preview curriculum without generating audio
-  {theme.cyan("/video")} [session]               Generate MP4 video (needs /generate first)
+  {theme.cyan("/next")}                          Skip to next unit
+  {theme.cyan("/prev")}                          Go back to previous unit
+  {theme.cyan("/replay")}                        Restart the current unit from the beginning
+  {theme.cyan("/status")}                        Show player state, current unit, time, Q&A count
+  {theme.cyan("/ask")} [question]                Ask a question about the current unit (LLM-powered)
+  {theme.cyan("/summary")}                       Print the current unit's summary and memory hook
+
+{theme.bold("─── VIDEO PIPELINE ──────────────────────────────────────────────────────────")}
+
+  {theme.cyan("/video")} [session]               Render slides + subtitles → assemble MP4
+                           Requires a completed /generate session.
+                           Output → video/<session>/full_session.mp4
   {theme.cyan("/vsessions")}                     List sessions that have a completed video
+
+{theme.bold("─── SHELL ───────────────────────────────────────────────────────────────────")}
+
+  {theme.cyan("/help")} [command]                Show this help, or detail for one command
   {theme.cyan("/clear")}                         Clear the terminal
-  {theme.cyan("/help")} [command]                Show this help or detail for one command
   {theme.cyan("/quit")}                          Exit LearnX
 
-{theme.bold("/generate flags:")}
-  --duration N          Target session length in minutes  (default: 20)
-  --difficulty LEVEL    beginner | intermediate | advanced (default: beginner)
-  --format FORMAT       tutor-student | dual-tutor        (default: tutor-student)
-  --topic TEXT          Force a specific concept into the curriculum
-  --units N             Cap the number of teaching units
-  --provider NAME       groq | openrouter                 (default: groq)
-  --no-cache            Clear cached summaries and regenerate
-  --script-only         Print script; skip audio generation
-  --dry-run             Preview curriculum; skip dialogue and audio
-  --verbose             Show per-step progress logs
-  --debug               Write DEBUG logs to tutor.log
+{theme.bold("─── EXAMPLES ────────────────────────────────────────────────────────────────")}
 
-{theme.bold("Examples:")}
-  /generate notes.md
-  /generate week2/3.md --difficulty intermediate --topic "HashMap internals"
-  /sessions
-  /play week2_3
-  /ask what is the difference between == and .equals()?
-  /dry-run notes.md --difficulty advanced
+  {theme.bold("Audio workflow:")}
+    /generate week2/3.md
+    /generate week2/3.md --difficulty intermediate --topic "HashMap internals"
+    /dry-run notes.md --difficulty advanced
+    /sessions
+    /play week2_3
+    /next
+    /ask what is the difference between == and .equals()?
+    /summary
+    /stop
+
+  {theme.bold("Video workflow:")}
+    /generate week2/3.md                 (run audio pipeline first)
+    /video week2_3                       (render video from existing session)
+    /vsessions                           (confirm video was created)
+
+  {theme.bold("Inspect without generating:")}
+    /inspect notes.md
+    /dry-run notes.md
 """
     print(lines)
 

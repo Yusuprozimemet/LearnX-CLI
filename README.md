@@ -2,7 +2,7 @@
 
 > **Spec-driven development project** — every feature was designed in a written specification before a single line of code was written. See [`specs/`](specs/) for the full day-by-day spec chain.
 
-Turn any Markdown document into an interactive audio tutorial with a live Q&A engine — all from a branded terminal shell.
+Turn any Markdown document into an interactive audio tutorial and a fully-produced MP4 video — all from a branded terminal shell.
 
 <p align="center">
   <img src="learnX.png" alt="LearnX CLI" />
@@ -13,8 +13,11 @@ Turn any Markdown document into an interactive audio tutorial with a live Q&A en
 ## What it does
 
 ```
-.md file → LLM dialogue → TTS audio → interactive player + Q&A
+.md file → LLM curriculum → TTS audio → interactive player + Q&A
+                                       → MP4 video (slides + subtitles)
 ```
+
+**Audio pipeline (v1):**
 
 1. **Ingests** a Markdown file and chunks it by heading structure or sliding window
 2. **Summarises** each chunk with an LLM and plans a teaching curriculum
@@ -22,24 +25,44 @@ Turn any Markdown document into an interactive audio tutorial with a live Q&A en
 4. **Renders** each unit to speech via Microsoft Azure Neural TTS (no TTS API key needed)
 5. **Plays back** through an interactive shell with pause, skip, replay, and a live Q&A engine
 
+**Video pipeline (v2):**
+
+6. **Plans** slide visuals — hook question, concept diagram spec, memory hook — per unit via LLM
+7. **Renders** diagrams to PNG using Graphviz
+8. **Composites** branded slides (1920×1080) using Pillow with a dark theme
+9. **Syncs** slides to audio via dialogue beat detection (first ALEX line → hook; first MAYA line → concept; last ALEX line → memory)
+10. **Assembles** the final MP4 with ffmpeg — unit videos concatenated, SRT subtitles embedded
+
 ---
 
 ## How it was built — spec-driven development
 
 Each feature day had a written specification reviewed and approved before implementation began:
 
+### v1 — Audio pipeline
+
 | Spec | Feature |
 |---|---|
-| [`specs/day1.md`](specs/day1.md) | Document ingestion — chunking strategies A/B/C |
-| [`specs/day2.md`](specs/day2.md) | LLM summarisation and curriculum planning |
-| [`specs/day3.md`](specs/day3.md) | Dialogue generation, difficulty levels, caching |
-| [`specs/day4.md`](specs/day4.md) | Interactive audio player — state machine, keyboard controls |
-| [`specs/day5.md`](specs/day5.md) | Live Q&A engine — grounded answers, session logging |
-| [`specs/day6.md`](specs/day6.md) | Dual-tutor format, `--topic` flag, code quality audit |
-| [`specs/day7.md`](specs/day7.md) | Branded `/command` shell — REPL, dynamic prompt, logo |
+| [`specs/v1/day1.md`](specs/v1/day1.md) | Document ingestion — chunking strategies A/B/C |
+| [`specs/v1/day2.md`](specs/v1/day2.md) | LLM summarisation and curriculum planning |
+| [`specs/v1/day3.md`](specs/v1/day3.md) | Dialogue generation, difficulty levels, caching |
+| [`specs/v1/day4.md`](specs/v1/day4.md) | Interactive audio player — state machine, keyboard controls |
+| [`specs/v1/day5.md`](specs/v1/day5.md) | Live Q&A engine — grounded answers, session logging |
+| [`specs/v1/day6.md`](specs/v1/day6.md) | Dual-tutor format, `--topic` flag, code quality audit |
+| [`specs/v1/day7.md`](specs/v1/day7.md) | Branded `/command` shell — REPL, dynamic prompt, logo |
 
-Post-implementation fixes are documented in [`specs/fix.md`](specs/fix.md).  
-Architecture plan: [`plan/v1_plan.md`](plan/v1_plan.md).
+### v2 — Video pipeline
+
+| Spec | Feature |
+|---|---|
+| [`specs/v2/day8.md`](specs/v2/day8.md) | Visual spec generation — slide plan via LLM |
+| [`specs/v2/day9.md`](specs/v2/day9.md) | Diagram rendering — Graphviz PNG output |
+| [`specs/v2/day10.md`](specs/v2/day10.md) | Slide compositor — 1920×1080 Pillow layout |
+| [`specs/v2/day11.md`](specs/v2/day11.md) | Subtitle writer + video assembler — SRT + ffmpeg |
+| [`specs/v2/day12.md`](specs/v2/day12.md) | Shell integration — `/video`, `/vsessions`, polish |
+
+Post-implementation fixes are documented in [`fixes/`](fixes/) (fix001–fix013).  
+Architecture plans: [`plan/v1_plan.md`](plan/v1_plan.md) · [`plan/v2_plan.md`](plan/v2_plan.md).
 
 ---
 
@@ -92,22 +115,43 @@ LearnX > /generate notes.md --difficulty intermediate
 LearnX [▶ 2/5  Pass-by-Value] > /ask what is the difference between == and .equals()?
 ```
 
+### Audio pipeline
+
 | Command | Description |
 |---|---|
-| `/generate <file.md> [flags]` | Generate audio from a Markdown file |
-| `/play [path]` | Start or resume playback |
-| `/pause` | Pause playback |
-| `/resume` | Resume playback |
-| `/stop` | Stop and unload the player |
-| `/next` | Jump to next unit |
-| `/prev` | Jump to previous unit |
-| `/replay` | Replay current unit |
-| `/ask [question]` | Ask a question about the current unit |
-| `/summary` | Print unit summary and memory hook |
-| `/status` | Show state, unit, elapsed time, Q&A count |
+| `/generate <file.md> [flags]` | Parse notes → generate dialogue → synthesise MP3s |
+| `/sessions` | List all audio sessions in `audio/` |
 | `/inspect <file.md>` | Show ingestion report — no LLM calls |
-| `/dry-run <file.md> [flags]` | Preview curriculum without generating audio |
+| `/dry-run <file.md> [flags]` | Preview curriculum; skip dialogue and audio |
+
+### Audio playback
+
+| Command | Description |
+|---|---|
+| `/play [session]` | Load and play a session |
+| `/pause` | Pause playback |
+| `/resume` | Resume from pause |
+| `/stop` | Stop and unload the player |
+| `/next` | Skip to next unit |
+| `/prev` | Go back to previous unit |
+| `/replay` | Restart current unit from the beginning |
+| `/status` | Show player state, unit, elapsed time, Q&A count |
+| `/ask [question]` | Ask a question about the current unit (LLM-powered) |
+| `/summary` | Print unit summary and memory hook |
+
+### Video pipeline
+
+| Command | Description |
+|---|---|
+| `/video [session]` | Render slides + subtitles → assemble `full_session.mp4` |
+| `/vsessions` | List sessions that have a completed video |
+
+### Shell
+
+| Command | Description |
+|---|---|
 | `/help [command]` | List all commands or show detail for one |
+| `/clear` | Clear the terminal |
 | `/quit` | Exit LearnX |
 
 ### `/generate` flags
@@ -125,6 +169,39 @@ LearnX [▶ 2/5  Pass-by-Value] > /ask what is the difference between == and .eq
 | `--dry-run` | — | Preview curriculum; skip dialogue and audio |
 | `--verbose` | — | Show INFO-level logs (per-unit progress) |
 | `--debug` | — | Write DEBUG logs to `tutor.log` |
+
+---
+
+## Typical workflows
+
+### Audio only
+
+```
+/generate week2/3.md
+/sessions
+/play week2_3
+/next
+/ask what is the difference between == and .equals()?
+/summary
+/stop
+```
+
+### Audio → Video
+
+```
+/generate week2/3.md          # produce audio first
+/video week2_3                # render video from existing session
+/vsessions                    # confirm output location
+```
+
+The video is written to `video/<session>/full_session.mp4`.
+
+### Inspect without generating
+
+```
+/inspect notes.md
+/dry-run notes.md --difficulty advanced
+```
 
 ---
 
@@ -188,21 +265,30 @@ Press `/ask` at any point during playback:
 3. The LLM answers in 1–3 seconds, grounded in the source document and prior exchanges
 4. Every exchange is saved to `tutorial.session.json`
 
-Use `--no-qa` with `/play` to disable Q&A entirely.
-
 ---
 
 ## Output files
+
+### Audio session — `audio/<session>/`
 
 | File | Contents |
 |---|---|
 | `tutorial.mp3` | Full concatenated audio |
 | `tutorial_units/` | Per-unit `.mp3` files for the player |
 | `tutorial.script.txt` | Full dialogue script |
-| `tutorial.units.json` | Teaching unit metadata |
+| `tutorial.units.json` | Teaching unit metadata (lines, concepts, key points) |
 | `tutorial.chunks.json` | Source chunks used for Q&A context |
+| `tutorial.meta.json` | Source file path (used by video pipeline for title) |
 | `tutorial.session.json` | Q&A exchanges from the current session |
-| `.tutor_cache/` | Cached summaries and dialogues |
+
+### Video session — `video/<session>/`
+
+| File | Contents |
+|---|---|
+| `full_session.mp4` | Final assembled video with subtitles |
+| `slides/` | Composited slide PNGs (title, hook, concept, memory, outro per unit) |
+| `subtitles.srt` | SRT subtitle file |
+| `tutorial.visuals.json` | Cached visual spec (slide plan from LLM) |
 
 ---
 
@@ -220,31 +306,47 @@ python -m pytest
 
 ```
 tutor/
-  cli/              # Interactive shell (Day 7)
-    shell.py        # REPL loop + dynamic prompt
-    commands.py     # /command handlers
-    logo.py         # ASCII banner
-    theme.py        # ANSI colour helpers
-  player/           # Audio player (Day 4)
-    player.py       # TutorPlayer state machine
+  cli/                  # Interactive shell
+    shell.py            # REPL loop + dynamic prompt
+    commands.py         # /command handlers (audio pipeline)
+    video_commands.py   # /video and /vsessions handlers
+    logo.py             # ASCII banner
+    theme.py            # ANSI colour helpers
+  player/               # Audio player
+    player.py           # TutorPlayer state machine
     player_display.py
     input_handler.py
-  generation/       # LLM pipeline (Days 2–3, 6)
+  generation/           # LLM pipeline
     curriculum.py
     dialogue.py
-  ingestion/        # Document parsing (Day 1)
+    visual_planner.py   # Slide plan generation (v2)
+  ingestion/            # Document parsing
     chunker.py
     summarizer.py
     doc_analyzer.py
-  qa/               # Q&A engine (Day 5)
+  qa/                   # Q&A engine
     qa.py
-  audio/            # TTS rendering (Day 4)
+  audio/                # TTS rendering
     audio_builder.py
     tts_renderer.py
+  visual/               # Video pipeline (v2)
+    __init__.py         # run_visual_pipeline() entry point
+    slide_compositor.py # Pillow slide layout (1920×1080)
+    slide_theme.py      # Colours, fonts, constants
+    slide_draw.py       # Drawing primitives
+    diagram_renderer.py # Graphviz PNG rendering
+    beat_timer.py       # Slide timing from dialogue beats
+    subtitle_writer.py  # SRT generation
+    video_assembler.py  # ffmpeg pipeline
   infra/
-    llm.py          # LLM client + config loader
-  llm_config.toml   # Model names, token budgets, call settings
-  prompts/          # Prompt templates
-specs/              # Day-by-day feature specifications
-plan/               # Architecture planning
+    llm.py              # LLM client + config loader
+  llm_config.toml       # Model names, token budgets, call settings
+  prompts/              # Prompt templates
+specs/
+  v1/                   # Audio pipeline specs (Days 1–7)
+  v2/                   # Video pipeline specs (Days 8–12)
+plan/                   # Architecture planning documents
+fixes/                  # Post-implementation fix notes (fix001–fix013)
+audio/                  # Generated audio sessions
+video/                  # Generated video sessions
 ```

@@ -7,6 +7,7 @@ from pathlib import Path
 from tutor.models import DialogueLine, VisualSpec
 
 MIN_SLIDE_DURATION  = 3.0   # seconds
+MAX_HOOK_DURATION   = 30.0  # cap hook slide — ALEX can monologue for a long time before MAYA
 TITLE_CARD_DURATION = 4.0
 OUTRO_CARD_DURATION = 6.0
 
@@ -28,13 +29,20 @@ def compute_slide_timings(
     slide_map = _build_slide_map(slides)
     beat_map  = _build_beat_map(script_lines, line_start_offsets, visuals, unit_durations_s)
 
+    # Pre-compute actual cumulative audio end for each unit (no silence inflation)
+    unit_audio_end: dict[int, float] = {}
+    _cursor = 0.0
+    for _ui, _dur in enumerate(unit_durations_s, start=1):
+        _cursor += _dur
+        unit_audio_end[_ui] = _cursor
+    total_audio_end = _cursor
+
     # Title card
     title_slide = slide_map.get("title")
     if title_slide:
         result.append((title_slide, TITLE_CARD_DURATION))
 
     # Per-unit slides
-    total_audio_end = sum(unit_durations_s) if unit_durations_s else 0.0
     for unit_idx in sorted(beat_map.keys()):
         beats = beat_map[unit_idx]   # {"hook": t, "concept": t, "memory": t}
 
@@ -42,15 +50,12 @@ def compute_slide_timings(
         concept_t = beats.get("concept", hook_t + MIN_SLIDE_DURATION)
         memory_t  = beats.get("memory", concept_t + MIN_SLIDE_DURATION)
 
-        # Next unit's hook start (or total audio end) defines memory slide end
-        next_starts = [
-            beat_map[u]["hook"]
-            for u in sorted(beat_map.keys()) if u > unit_idx
-        ]
-        unit_end = next_starts[0] if next_starts else total_audio_end
+        # Use actual MP3 boundary (not inflated line offsets) so slides match audio
+        unit_end = unit_audio_end.get(unit_idx, total_audio_end)
 
-        hook_dur    = _clamp(concept_t - hook_t)
-        concept_dur = _clamp(memory_t - concept_t)
+        raw_hook    = concept_t - hook_t
+        hook_dur    = _clamp(min(raw_hook, MAX_HOOK_DURATION))
+        concept_dur = _clamp(memory_t - concept_t + max(0.0, raw_hook - MAX_HOOK_DURATION))
         memory_dur  = _clamp(unit_end - memory_t)
 
         hook_slide    = slide_map.get(f"{unit_idx:02d}_hook")

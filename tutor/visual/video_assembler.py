@@ -46,7 +46,7 @@ def assemble_session(
         unit_entries.setdefault(unit_idx, []).append((p, d))
 
     unit_mp4s: list[Path] = []
-    total_steps = 2 + len(unit_mp3s) + 2   # title, units, concat, subtitles
+    total_steps = 2 + len(unit_mp3s) + 2   # title, N units, concat, subtitles
     step = 0
 
     # Title card
@@ -64,9 +64,7 @@ def assemble_session(
         print(f"  [{step}/{total_steps}] Rendering unit {mp3_idx}/{len(unit_mp3s)} — {unit_name}...")
         out = session_dir / f"unit_{mp3_idx:02d}.mp4"
         _build_unit_video(entries, mp3, out)
-        norm_out = session_dir / f"unit_{mp3_idx:02d}_norm.mp4"
-        _normalize_audio(out, norm_out)
-        unit_mp4s.append(norm_out)
+        unit_mp4s.append(out)
 
     # Outro card
     if outro_entry:
@@ -125,10 +123,14 @@ def _build_unit_video(
         "ffmpeg", "-y",
         "-f", "concat", "-safe", "0", "-i", str(script_path),
         "-i", str(mp3),
+        "-map", "0:v:0",
+        "-map", "1:a:0",
         "-c:v", "libx264", "-preset", ENCODE_PRESET, "-crf", ENCODE_CRF,
-        "-c:a", "aac", "-b:a", AUDIO_BITRATE,
+        "-c:a", "aac", "-b:a", AUDIO_BITRATE, "-ar", "44100", "-ac", "2",
+        "-af", "volume=5dB",
         "-pix_fmt", "yuv420p",
         "-vf", SCALE_FILTER,
+        "-shortest",
         str(output),
     ])
     return output
@@ -176,12 +178,31 @@ def _embed_subtitles(video: Path, srt: Path, output: Path) -> Path:
 
 
 def _normalize_audio(video: Path, output: Path) -> Path:
-    _run_ffmpeg([
-        "ffmpeg", "-y",
-        "-i", str(video),
-        "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
-        str(output),
-    ])
+    # Step 1: normalize audio stream only (no video — avoids timing issues
+    #         with image-based concat demuxer that has huge inter-frame gaps)
+    norm_audio = video.with_suffix(".norm_tmp.aac")
+    try:
+        _run_ffmpeg([
+            "ffmpeg", "-y",
+            "-i", str(video),
+            "-vn",
+            "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
+            "-c:a", "aac", "-b:a", AUDIO_BITRATE,
+            str(norm_audio),
+        ])
+        # Step 2: mux original video + normalized audio
+        _run_ffmpeg([
+            "ffmpeg", "-y",
+            "-i", str(video),
+            "-i", str(norm_audio),
+            "-map", "0:v:0",
+            "-map", "1:a:0",
+            "-c:v", "copy",
+            "-c:a", "copy",
+            str(output),
+        ])
+    finally:
+        norm_audio.unlink(missing_ok=True)
     return output
 
 
