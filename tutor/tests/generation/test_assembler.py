@@ -44,7 +44,7 @@ def test_assemble_ends_with_outro():
 def test_assemble_transitions_between_units():
     units = [_make_unit(1), _make_unit(2)]
     result = assemble(units, [_make_lines(1), _make_lines(2)], "tutor-student", "Java Basics")
-    unit_numbers = [l.unit_number for l in result]
+    unit_numbers = [ln.unit_number for ln in result]
     assert 1 in unit_numbers and 2 in unit_numbers
 
 

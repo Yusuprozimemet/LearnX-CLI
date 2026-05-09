@@ -9,6 +9,8 @@ from dataclasses import asdict
 from functools import partial
 from pathlib import Path
 
+from tutor import inspector
+from tutor.audio import audio_builder
 from tutor.config import preflight
 from tutor.constants import (
     DEFAULT_DIFFICULTY,
@@ -17,12 +19,10 @@ from tutor.constants import (
     DEFAULT_SUBJECT,
     WPM,
 )
-from tutor.audio import audio_builder
 from tutor.exceptions import TutorError
 from tutor.generation import assembler, curriculum, dialogue
 from tutor.infra import llm
 from tutor.ingestion import chunker, doc_analyzer, summarizer
-from tutor import inspector
 from tutor.models import DialogueLine, TeachingUnit
 
 
@@ -167,7 +167,7 @@ def _run_audio(args, units: list[TeachingUnit], script: list[DialogueLine]) -> N
     with open(units_json_path, "w", encoding="utf-8") as f:
         json.dump([asdict(u) for u in units], f, indent=2, ensure_ascii=False)
 
-    print(f"\nDone.")
+    print("\nDone.")
     print(f"  Audio:  {args.output}")
     print(f"  Units:  {units_dir}/")
     print(f"  Script: {script_path}")
@@ -184,11 +184,12 @@ def _build_player(args):
     import json
     from datetime import datetime
     from functools import partial as _partial
-    from tutor.player.player import TutorPlayer
-    from tutor.models import TeachingUnit, Chunk, SessionLog
-    from tutor.exceptions import PlayerError
+
     from tutor.config import load_config
+    from tutor.exceptions import PlayerError
     from tutor.infra import llm as _llm
+    from tutor.models import Chunk, SessionLog, TeachingUnit
+    from tutor.player.player import TutorPlayer
 
     _log = logging.getLogger(__name__)
 
@@ -200,8 +201,7 @@ def _build_player(args):
 
     if not units_dir.exists():
         raise PlayerError(
-            f"tutorial_units/ not found at {units_dir}.\n"
-            "  Run generation first or use /generate."
+            f"tutorial_units/ not found at {units_dir}.\n  Run generation first or use /generate."
         )
 
     unit_files = sorted(units_dir.glob("*.mp3"))
@@ -308,7 +308,7 @@ def _print_duration_estimate(script: list[DialogueLine]) -> None:
     silence_secs = 80
     total_secs = int(dialogue_secs + silence_secs)
     mins, secs = divmod(total_secs, 60)
-    print(f"\n=== Duration Estimate ===")
+    print("\n=== Duration Estimate ===")
     print(f"Script words:  {total_words:,}")
     print(f"Estimated:     ~{mins}m {secs:02d}s (incl. pauses)")
 

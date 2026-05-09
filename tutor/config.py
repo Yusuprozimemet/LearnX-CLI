@@ -111,6 +111,7 @@ def _inject_ffmpeg(bin_dir: Path) -> None:
     # Patch pydub's runtime converter path if pydub is already imported.
     try:
         import pydub
+
         pydub.AudioSegment.converter = str(bin_dir / "ffmpeg.exe")
         pydub.AudioSegment.ffmpeg = str(bin_dir / "ffmpeg.exe")
         pydub.AudioSegment.ffprobe = str(bin_dir / "ffprobe.exe")

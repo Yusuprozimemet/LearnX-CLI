@@ -1,10 +1,9 @@
 import subprocess
-from pathlib import Path
 
 import pytest
 
-from tutor.exceptions import VideoError
 import tutor.visual.video_assembler as va
+from tutor.exceptions import VideoError
 
 
 def test_concat_script_written_correctly(tmp_path):
@@ -62,8 +61,7 @@ def test_run_ffmpeg_raises_on_nonzero_exit(monkeypatch):
 
 def test_run_ffmpeg_no_error_on_success(monkeypatch):
     monkeypatch.setattr(
-        subprocess, "run",
-        lambda args, **kw: subprocess.CompletedProcess(args, 0, b"", b"")
+        subprocess, "run", lambda args, **kw: subprocess.CompletedProcess(args, 0, b"", b"")
     )
     va._run_ffmpeg(["ffmpeg", "-version"])  # should not raise
 
@@ -90,7 +88,7 @@ def test_concat_script_single_entry(tmp_path):
     va._write_concat_script(entries, script)
 
     content = script.read_text()
-    lines = [l for l in content.strip().splitlines() if l.startswith("file")]
+    lines = [ln for ln in content.strip().splitlines() if ln.startswith("file")]
     # Single entry repeated twice
     assert len(lines) == 2
     assert lines[0] == lines[1]

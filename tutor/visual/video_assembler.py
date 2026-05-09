@@ -2,6 +2,7 @@
 ffmpeg wrappers for assembling slides + audio into MP4 videos.
 No Pillow, no LLM, no audio processing here — only subprocess calls.
 """
+
 import logging
 import subprocess
 from pathlib import Path
@@ -11,11 +12,13 @@ from tutor.exceptions import VideoError
 log = logging.getLogger(__name__)
 
 ENCODE_PRESET = "medium"
-ENCODE_CRF    = "23"
+ENCODE_CRF = "23"
 AUDIO_BITRATE = "128k"
-TITLE_DURATION  = "4"
-OUTRO_DURATION  = "6"
-SCALE_FILTER = "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2"
+TITLE_DURATION = "4"
+OUTRO_DURATION = "6"
+SCALE_FILTER = (
+    "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2"
+)
 
 
 def assemble_session(
@@ -30,8 +33,8 @@ def assemble_session(
     Returns path to full_session.mp4.
     """
     # Collect special slides
-    title_entry  = next(((p, d) for p, d in slide_timings if "_title" in p.stem), None)
-    outro_entry  = next(((p, d) for p, d in slide_timings if "_outro" in p.stem), None)
+    title_entry = next(((p, d) for p, d in slide_timings if "_title" in p.stem), None)
+    outro_entry = next(((p, d) for p, d in slide_timings if "_outro" in p.stem), None)
 
     # Group remaining slides by unit
     unit_entries: dict[int, list[tuple[Path, float]]] = {}
@@ -46,7 +49,7 @@ def assemble_session(
         unit_entries.setdefault(unit_idx, []).append((p, d))
 
     unit_mp4s: list[Path] = []
-    total_steps = 2 + len(unit_mp3s) + 2   # title, N units, concat, subtitles
+    total_steps = 2 + len(unit_mp3s) + 2  # title, N units, concat, subtitles
     step = 0
 
     # Title card
@@ -61,7 +64,9 @@ def assemble_session(
         step += 1
         entries = unit_entries.get(mp3_idx, [])
         unit_name = mp3.stem
-        print(f"  [{step}/{total_steps}] Rendering unit {mp3_idx}/{len(unit_mp3s)} — {unit_name}...")
+        print(
+            f"  [{step}/{total_steps}] Rendering unit {mp3_idx}/{len(unit_mp3s)} — {unit_name}..."
+        )
         out = session_dir / f"unit_{mp3_idx:02d}.mp4"
         _build_unit_video(entries, mp3, out)
         unit_mp4s.append(out)
@@ -93,17 +98,38 @@ def assemble_session(
 
 
 def _build_title_video(title_slide: Path, output: Path) -> Path:
-    _run_ffmpeg([
-        "ffmpeg", "-y",
-        "-loop", "1", "-i", str(title_slide), "-t", TITLE_DURATION,
-        "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
-        "-c:v", "libx264", "-preset", ENCODE_PRESET, "-crf", ENCODE_CRF,
-        "-c:a", "aac", "-b:a", AUDIO_BITRATE,
-        "-pix_fmt", "yuv420p",
-        "-vf", SCALE_FILTER,
-        "-shortest",
-        str(output),
-    ])
+    _run_ffmpeg(
+        [
+            "ffmpeg",
+            "-y",
+            "-loop",
+            "1",
+            "-i",
+            str(title_slide),
+            "-t",
+            TITLE_DURATION,
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=channel_layout=stereo:sample_rate=44100",
+            "-c:v",
+            "libx264",
+            "-preset",
+            ENCODE_PRESET,
+            "-crf",
+            ENCODE_CRF,
+            "-c:a",
+            "aac",
+            "-b:a",
+            AUDIO_BITRATE,
+            "-pix_fmt",
+            "yuv420p",
+            "-vf",
+            SCALE_FILTER,
+            "-shortest",
+            str(output),
+        ]
+    )
     return output
 
 
@@ -119,35 +145,82 @@ def _build_unit_video(
     script_path = output.with_suffix(".concat.txt")
     _write_concat_script(slides_with_dur, script_path)
 
-    _run_ffmpeg([
-        "ffmpeg", "-y",
-        "-f", "concat", "-safe", "0", "-i", str(script_path),
-        "-i", str(mp3),
-        "-map", "0:v:0",
-        "-map", "1:a:0",
-        "-c:v", "libx264", "-preset", ENCODE_PRESET, "-crf", ENCODE_CRF,
-        "-c:a", "aac", "-b:a", AUDIO_BITRATE, "-ar", "44100", "-ac", "2",
-        "-af", "volume=5dB",
-        "-pix_fmt", "yuv420p",
-        "-vf", SCALE_FILTER,
-        "-shortest",
-        str(output),
-    ])
+    _run_ffmpeg(
+        [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            str(script_path),
+            "-i",
+            str(mp3),
+            "-map",
+            "0:v:0",
+            "-map",
+            "1:a:0",
+            "-c:v",
+            "libx264",
+            "-preset",
+            ENCODE_PRESET,
+            "-crf",
+            ENCODE_CRF,
+            "-c:a",
+            "aac",
+            "-b:a",
+            AUDIO_BITRATE,
+            "-ar",
+            "44100",
+            "-ac",
+            "2",
+            "-af",
+            "volume=5dB",
+            "-pix_fmt",
+            "yuv420p",
+            "-vf",
+            SCALE_FILTER,
+            "-shortest",
+            str(output),
+        ]
+    )
     return output
 
 
 def _build_outro_video(outro_slide: Path, output: Path) -> Path:
-    _run_ffmpeg([
-        "ffmpeg", "-y",
-        "-loop", "1", "-i", str(outro_slide), "-t", OUTRO_DURATION,
-        "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
-        "-c:v", "libx264", "-preset", ENCODE_PRESET, "-crf", ENCODE_CRF,
-        "-c:a", "aac", "-b:a", AUDIO_BITRATE,
-        "-pix_fmt", "yuv420p",
-        "-vf", SCALE_FILTER,
-        "-shortest",
-        str(output),
-    ])
+    _run_ffmpeg(
+        [
+            "ffmpeg",
+            "-y",
+            "-loop",
+            "1",
+            "-i",
+            str(outro_slide),
+            "-t",
+            OUTRO_DURATION,
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=channel_layout=stereo:sample_rate=44100",
+            "-c:v",
+            "libx264",
+            "-preset",
+            ENCODE_PRESET,
+            "-crf",
+            ENCODE_CRF,
+            "-c:a",
+            "aac",
+            "-b:a",
+            AUDIO_BITRATE,
+            "-pix_fmt",
+            "yuv420p",
+            "-vf",
+            SCALE_FILTER,
+            "-shortest",
+            str(output),
+        ]
+    )
     return output
 
 
@@ -156,24 +229,42 @@ def _concat_unit_videos(unit_mp4s: list[Path], output: Path) -> Path:
     lines = ["ffconcat version 1.0"] + [f"file '{p.name}'" for p in unit_mp4s]
     list_path.write_text("\n".join(lines), encoding="utf-8")
 
-    _run_ffmpeg([
-        "ffmpeg", "-y",
-        "-f", "concat", "-safe", "0", "-i", str(list_path),
-        "-c", "copy",
-        str(output),
-    ])
+    _run_ffmpeg(
+        [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            str(list_path),
+            "-c",
+            "copy",
+            str(output),
+        ]
+    )
     return output
 
 
 def _embed_subtitles(video: Path, srt: Path, output: Path) -> Path:
-    _run_ffmpeg([
-        "ffmpeg", "-y",
-        "-i", str(video),
-        "-i", str(srt),
-        "-c", "copy", "-c:s", "mov_text",
-        "-metadata:s:s:0", "language=eng",
-        str(output),
-    ])
+    _run_ffmpeg(
+        [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(video),
+            "-i",
+            str(srt),
+            "-c",
+            "copy",
+            "-c:s",
+            "mov_text",
+            "-metadata:s:s:0",
+            "language=eng",
+            str(output),
+        ]
+    )
     return output
 
 
@@ -182,25 +273,42 @@ def _normalize_audio(video: Path, output: Path) -> Path:
     #         with image-based concat demuxer that has huge inter-frame gaps)
     norm_audio = video.with_suffix(".norm_tmp.aac")
     try:
-        _run_ffmpeg([
-            "ffmpeg", "-y",
-            "-i", str(video),
-            "-vn",
-            "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
-            "-c:a", "aac", "-b:a", AUDIO_BITRATE,
-            str(norm_audio),
-        ])
+        _run_ffmpeg(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(video),
+                "-vn",
+                "-af",
+                "loudnorm=I=-16:TP=-1.5:LRA=11",
+                "-c:a",
+                "aac",
+                "-b:a",
+                AUDIO_BITRATE,
+                str(norm_audio),
+            ]
+        )
         # Step 2: mux original video + normalized audio
-        _run_ffmpeg([
-            "ffmpeg", "-y",
-            "-i", str(video),
-            "-i", str(norm_audio),
-            "-map", "0:v:0",
-            "-map", "1:a:0",
-            "-c:v", "copy",
-            "-c:a", "copy",
-            str(output),
-        ])
+        _run_ffmpeg(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(video),
+                "-i",
+                str(norm_audio),
+                "-map",
+                "0:v:0",
+                "-map",
+                "1:a:0",
+                "-c:v",
+                "copy",
+                "-c:a",
+                "copy",
+                str(output),
+            ]
+        )
     finally:
         norm_audio.unlink(missing_ok=True)
     return output

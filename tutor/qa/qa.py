@@ -1,10 +1,10 @@
+import json
 import logging
 from datetime import datetime
 from pathlib import Path
-import json
 
-from tutor.models import TeachingUnit, Chunk, QAExchange, SessionLog
 from tutor.exceptions import LLMError
+from tutor.models import Chunk, QAExchange, SessionLog, TeachingUnit
 
 log = logging.getLogger(__name__)
 
@@ -45,11 +45,7 @@ def _build_context(
 ) -> str:
     chunk_map = {c.chunk_id: c for c in all_chunks}
 
-    current_chunks = [
-        chunk_map[s]
-        for s in current_unit.source_sections
-        if s in chunk_map
-    ]
+    current_chunks = [chunk_map[s] for s in current_unit.source_sections if s in chunk_map]
 
     recent = session.exchanges[-3:] if session.exchanges else []
 
@@ -91,6 +87,7 @@ def _append_exchange(
 
 def _save_session(session: SessionLog) -> None:
     from dataclasses import asdict
+
     path = Path("tutorial.session.json")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(asdict(session), f, indent=2, ensure_ascii=False)

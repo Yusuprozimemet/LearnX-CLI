@@ -1,9 +1,9 @@
 import hashlib
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
-from typing import Callable
 
 from tutor.constants import SUMMARY_CACHE_DIR
 from tutor.exceptions import LLMError
@@ -92,7 +92,9 @@ def _plan_unit(
     except Exception as exc:
         log.warning(
             "Visual spec failed for unit %d (%s): %s — using fallback",
-            unit.unit, unit.concept, exc,
+            unit.unit,
+            unit.concept,
+            exc,
         )
         spec = _fallback_spec(unit)
 
@@ -117,7 +119,9 @@ def _parse_visual_response(raw: str, unit: TeachingUnit) -> VisualSpec:
 
     diagram_type = data.get("diagram_type", "none")
     if diagram_type not in VALID_DIAGRAM_TYPES:
-        log.warning("Unknown diagram_type %r for unit %d — falling back to 'none'", diagram_type, unit.unit)
+        log.warning(
+            "Unknown diagram_type %r for unit %d — falling back to 'none'", diagram_type, unit.unit
+        )
         diagram_type = "none"
 
     diagram_spec = data.get("diagram_spec")
@@ -137,14 +141,10 @@ def _parse_visual_response(raw: str, unit: TeachingUnit) -> VisualSpec:
     )
 
 
-def _validate_diagram(
-    diagram_type: str, diagram_spec: object, unit_idx: int
-) -> tuple[str, object]:
+def _validate_diagram(diagram_type: str, diagram_spec: object, unit_idx: int) -> tuple[str, object]:
     if diagram_type in ("class_diagram", "flowchart", "concept_map"):
         if not isinstance(diagram_spec, str) or not _looks_like_dot(diagram_spec):
-            log.warning(
-                "diagram_spec for unit %d is not valid DOT — setting to 'none'", unit_idx
-            )
+            log.warning("diagram_spec for unit %d is not valid DOT — setting to 'none'", unit_idx)
             return "none", None
     elif diagram_type == "code_comparison":
         if not isinstance(diagram_spec, dict) or not all(

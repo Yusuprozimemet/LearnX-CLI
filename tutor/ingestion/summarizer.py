@@ -3,8 +3,7 @@ import logging
 from pathlib import Path
 
 from tutor.constants import PROMPT_VERSION, SUMMARY_CACHE_DIR
-from tutor.infra.llm import LIMITS
-from tutor.infra.llm import load_prompt
+from tutor.infra.llm import LIMITS, load_prompt
 from tutor.models import Chunk
 
 log = logging.getLogger(__name__)

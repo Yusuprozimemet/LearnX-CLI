@@ -2,7 +2,7 @@ import argparse
 import logging
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from tutor.cli import theme
@@ -14,7 +14,7 @@ AUDIO_DIR = Path("audio")
 
 @dataclass
 class ShellContext:
-    player: object = None                          # TutorPlayer | None
+    player: object = None  # TutorPlayer | None
     player_thread: threading.Thread | None = None
     last_units_dir: Path | None = None
     current_session: str | None = None
@@ -24,6 +24,7 @@ class ShellContext:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _require_player(ctx: ShellContext, require_unit: bool = False) -> bool:
     if not ctx.player:
@@ -48,6 +49,7 @@ def _get_flag(tokens: list[str], flag: str, default: str) -> str:
 
 def _parse_generate_args(tokens: list[str]):
     from tutor.tutor import _make_generate_parser
+
     parser = _make_generate_parser()
     try:
         return parser.parse_args(tokens)
@@ -57,6 +59,7 @@ def _parse_generate_args(tokens: list[str]):
 
 def _apply_log_level(args) -> None:
     import logging as _logging
+
     if getattr(args, "debug", False):
         _logging.getLogger().setLevel(_logging.DEBUG)
     elif getattr(args, "verbose", False):
@@ -65,7 +68,9 @@ def _apply_log_level(args) -> None:
 
 def _session_name(input_path: str) -> str:
     """Derive a safe folder name from the input file path, e.g. week2/3.md → week2_3."""
-    return Path(input_path).with_suffix("").as_posix().replace("/", "_").replace("\\", "_").lstrip("_")
+    return (
+        Path(input_path).with_suffix("").as_posix().replace("/", "_").replace("\\", "_").lstrip("_")
+    )
 
 
 def _resolve_units_dir(token: str) -> Path | None:
@@ -94,6 +99,7 @@ def _resolve_units_dir(token: str) -> Path | None:
 # Command handlers
 # ---------------------------------------------------------------------------
 
+
 def cmd_generate(tokens: list[str], ctx: ShellContext) -> None:
     """Usage: /generate <file.md> [--duration N] [--difficulty LEVEL]
               [--format FORMAT] [--topic TEXT] [--units N] [--no-cache]
@@ -118,25 +124,32 @@ def cmd_generate(tokens: list[str], ctx: ShellContext) -> None:
         args.output = str(AUDIO_DIR / session / "tutorial.mp3")
 
     # Ensure the output parent directory exists
-    if args.input and not getattr(args, "dry_run", False) \
-            and not getattr(args, "inspect", False) \
-            and not getattr(args, "script_only", False):
+    if (
+        args.input
+        and not getattr(args, "dry_run", False)
+        and not getattr(args, "inspect", False)
+        and not getattr(args, "script_only", False)
+    ):
         Path(args.output).parent.mkdir(parents=True, exist_ok=True)
 
     from tutor import tutor as _tutor
     from tutor.exceptions import TutorError
+
     try:
         _tutor.cmd_generate(args)
         output = Path(getattr(args, "output", "tutorial.mp3"))
         ctx.last_units_dir = output.parent / "tutorial_units"
-        if not getattr(args, "dry_run", False) \
-                and not getattr(args, "inspect", False) \
-                and not getattr(args, "script_only", False):
+        if (
+            not getattr(args, "dry_run", False)
+            and not getattr(args, "inspect", False)
+            and not getattr(args, "script_only", False)
+        ):
             session = _session_name(args.input) if args.input else ""
             ctx.current_session = session
             # Write source metadata so the visual pipeline can find the doc title
             if args.input:
                 import json as _json
+
                 meta = {"source_file": str(args.input)}
                 (output.parent / "tutorial.meta.json").write_text(
                     _json.dumps(meta, ensure_ascii=False), encoding="utf-8"
@@ -160,8 +173,7 @@ def cmd_sessions(tokens: list[str], ctx: ShellContext) -> None:
         return
 
     sessions = sorted(
-        d for d in AUDIO_DIR.iterdir()
-        if d.is_dir() and (d / "tutorial_units").exists()
+        d for d in AUDIO_DIR.iterdir() if d.is_dir() and (d / "tutorial_units").exists()
     )
     if not sessions:
         print(theme.dim("  No sessions yet. Use /generate to create one."))
@@ -173,9 +185,9 @@ def cmd_sessions(tokens: list[str], ctx: ShellContext) -> None:
         mp3 = s / "tutorial.mp3"
         size = f"{mp3.stat().st_size // 1024} KB" if mp3.exists() else "—"
         has_mp4 = (VIDEO_DIR / s.name / "full_session.mp4").exists()
-        badge   = theme.green("  [mp4]") if has_mp4 else ""
+        badge = theme.green("  [mp4]") if has_mp4 else ""
         print(f"  {theme.cyan(s.name):<30} {len(units)} units   {size}{badge}")
-    print(theme.dim(f"\n  Play with: /play <session-name>"))
+    print(theme.dim("\n  Play with: /play <session-name>"))
     print(theme.dim("  Generate video: /video <session-name>"))
     print()
 
@@ -215,8 +227,8 @@ def cmd_play(tokens: list[str], ctx: ShellContext) -> None:
         ctx.player = None
         ctx.player_thread = None
 
-    from tutor.tutor import _build_player
     from tutor.exceptions import TutorError
+    from tutor.tutor import _build_player
 
     play_args = argparse.Namespace(
         audio_file=str(units_dir),
@@ -339,10 +351,10 @@ def cmd_status(tokens: list[str], ctx: ShellContext) -> None:
         return
     p = ctx.player
     state_icons = {
-        "PLAYING":   theme.green("▶ Playing"),
-        "PAUSED":    theme.yellow("⏸ Paused"),
-        "STOPPED":   theme.dim("■ Stopped"),
-        "ASKING":    theme.cyan("? Asking"),
+        "PLAYING": theme.green("▶ Playing"),
+        "PAUSED": theme.yellow("⏸ Paused"),
+        "STOPPED": theme.dim("■ Stopped"),
+        "ASKING": theme.cyan("? Asking"),
         "ANSWERING": theme.cyan("⟳ Answering"),
     }
     state_str = state_icons.get(p._state, p._state)
@@ -383,6 +395,7 @@ def cmd_inspect(tokens: list[str], ctx: ShellContext) -> None:
     )
     from tutor import tutor as _tutor
     from tutor.exceptions import TutorError
+
     try:
         _tutor.cmd_generate(args)
     except TutorError as e:
@@ -399,6 +412,7 @@ def cmd_dryrun(tokens: list[str], ctx: ShellContext) -> None:
         return
     from tutor import tutor as _tutor
     from tutor.exceptions import TutorError
+
     try:
         _tutor.cmd_generate(args)
     except TutorError as e:
@@ -408,6 +422,7 @@ def cmd_dryrun(tokens: list[str], ctx: ShellContext) -> None:
 def cmd_clear(tokens: list[str], ctx: ShellContext) -> None:
     """Usage: /clear — clear the terminal"""
     import os
+
     os.system("cls" if os.name == "nt" else "clear")
 
 
@@ -502,26 +517,26 @@ def cmd_help(tokens: list[str], ctx: ShellContext) -> None:
 
 COMMAND_MAP: dict[str, object] = {
     "/generate": cmd_generate,
-    "/gen":      cmd_generate,
+    "/gen": cmd_generate,
     "/sessions": cmd_sessions,
-    "/play":     cmd_play,
-    "/pause":    cmd_pause,
-    "/resume":   cmd_resume,
-    "/stop":     cmd_stop,
-    "/next":     cmd_next,
-    "/prev":     cmd_prev,
-    "/back":     cmd_prev,
-    "/replay":   cmd_replay,
-    "/ask":      cmd_ask,
-    "/summary":  cmd_summary,
-    "/status":   cmd_status,
-    "/inspect":  cmd_inspect,
-    "/dry-run":  cmd_dryrun,
-    "/dryrun":   cmd_dryrun,
-    "/clear":    cmd_clear,
-    "/help":     cmd_help,
-    "/?":        cmd_help,
-    "/quit":     None,
-    "/exit":     None,
-    "/q":        None,
+    "/play": cmd_play,
+    "/pause": cmd_pause,
+    "/resume": cmd_resume,
+    "/stop": cmd_stop,
+    "/next": cmd_next,
+    "/prev": cmd_prev,
+    "/back": cmd_prev,
+    "/replay": cmd_replay,
+    "/ask": cmd_ask,
+    "/summary": cmd_summary,
+    "/status": cmd_status,
+    "/inspect": cmd_inspect,
+    "/dry-run": cmd_dryrun,
+    "/dryrun": cmd_dryrun,
+    "/clear": cmd_clear,
+    "/help": cmd_help,
+    "/?": cmd_help,
+    "/quit": None,
+    "/exit": None,
+    "/q": None,
 }

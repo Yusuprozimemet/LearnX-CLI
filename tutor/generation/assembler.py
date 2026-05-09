@@ -12,7 +12,7 @@ def assemble(
 
     result.extend(_build_intro(units, doc_title))
 
-    for i, (unit, lines) in enumerate(zip(units, all_lines)):
+    for i, (unit, lines) in enumerate(zip(units, all_lines, strict=False)):
         result.extend(lines)
         if i < len(units) - 1:
             result.append(

@@ -1,11 +1,11 @@
 import sys
 
-from tutor.cli.logo import print_welcome
-from tutor.cli.commands import COMMAND_MAP, ShellContext
 from tutor.cli import theme
+from tutor.cli.commands import COMMAND_MAP, ShellContext
+from tutor.cli.logo import print_welcome
 from tutor.cli.video_commands import cmd_video, cmd_vsessions
 
-COMMAND_MAP["/video"]     = cmd_video
+COMMAND_MAP["/video"] = cmd_video
 COMMAND_MAP["/vsessions"] = cmd_vsessions
 
 
@@ -42,6 +42,7 @@ def run_shell() -> None:
         # Bare text while a session is active → route as /ask
         if not line.startswith("/") and ctx.player and ctx.player._state not in ("STOPPED", None):
             from tutor.cli.commands import cmd_ask
+
             cmd_ask(line.split(), ctx)
             continue
 
@@ -73,6 +74,7 @@ def _prime_ffmpeg() -> None:
     """Inject ffmpeg into PATH before pydub is imported so its warning never fires."""
     try:
         from tutor.config import _check_ffmpeg
+
         _check_ffmpeg()
     except Exception:
         pass
@@ -81,7 +83,9 @@ def _prime_ffmpeg() -> None:
 def _setup_utf8() -> None:
     if hasattr(sys.stdout, "buffer"):
         import io
+
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     if hasattr(sys.stderr, "buffer"):
         import io
+
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")

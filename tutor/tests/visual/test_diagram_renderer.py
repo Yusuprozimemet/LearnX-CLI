@@ -4,11 +4,11 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from tutor.models import VisualSpec
 import tutor.visual.diagram_renderer as dr
-
+from tutor.models import VisualSpec
 
 # ── Fixtures ────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture(autouse=True)
 def reset_graphviz_state():
@@ -34,6 +34,7 @@ def _make_spec(**kwargs) -> VisualSpec:
 
 def _fake_run_ok(output_path: Path):
     """Return a fake subprocess.run that creates a black PNG at output_path."""
+
     def _run(cmd, **kwargs):
         # Find the -o<path> argument and create a minimal PNG there.
         for arg in cmd:
@@ -42,10 +43,12 @@ def _fake_run_ok(output_path: Path):
                 Image.new("RGB", (800, 500), "#0d1117").save(s[2:], "PNG")
                 break
         return subprocess.CompletedProcess(cmd, 0, b"", b"")
+
     return _run
 
 
 # ── _apply_dark_theme ───────────────────────────────────────────────────────
+
 
 def test_dark_theme_injected_when_bgcolor_missing():
     dot = "digraph G { A -> B }"
@@ -58,7 +61,7 @@ def test_dark_theme_not_injected_when_bgcolor_present():
     dot = 'digraph G { graph [bgcolor="#0d1117"] A -> B }'
     result = dr._apply_dark_theme(dot)
     # Should not duplicate bgcolor
-    assert result.count('bgcolor=') == 1
+    assert result.count("bgcolor=") == 1
 
 
 def test_dark_theme_no_brace_returns_unchanged():
@@ -67,6 +70,7 @@ def test_dark_theme_no_brace_returns_unchanged():
 
 
 # ── analogy fallback ────────────────────────────────────────────────────────
+
 
 def test_analogy_fallback_creates_png(tmp_path):
     out = tmp_path / "analogy.png"
@@ -94,6 +98,7 @@ def test_render_diagram_none_type_returns_analogy_png(tmp_path):
 
 
 # ── code_comparison ─────────────────────────────────────────────────────────
+
 
 def test_code_comparison_creates_png(tmp_path):
     spec = _make_spec(
@@ -128,7 +133,7 @@ def test_code_comparison_no_graphviz_subprocess(tmp_path, monkeypatch):
 def test_code_comparison_bad_spec_falls_back_to_analogy(tmp_path):
     spec = _make_spec(
         diagram_type="code_comparison",
-        diagram_spec="not a dict",   # wrong type
+        diagram_spec="not a dict",  # wrong type
     )
     result = dr.render_diagram(spec, tmp_path)
     assert result is not None
@@ -140,9 +145,10 @@ def test_code_comparison_bad_spec_falls_back_to_analogy(tmp_path):
 
 # ── graphviz paths (subprocess mocked) ─────────────────────────────────────
 
+
 def test_class_diagram_produces_png(tmp_path, monkeypatch):
     monkeypatch.setattr(subprocess, "run", _fake_run_ok(tmp_path))
-    dr._graphviz_ready = True   # skip the probe
+    dr._graphviz_ready = True  # skip the probe
 
     spec = _make_spec(
         diagram_type="class_diagram",
@@ -207,10 +213,11 @@ def test_invalid_dot_falls_back_to_analogy(tmp_path, monkeypatch):
     assert result is not None
     assert result.exists()
     img = Image.open(result)
-    assert img.size == (800, 260)   # analogy fallback dimensions
+    assert img.size == (800, 260)  # analogy fallback dimensions
 
 
 # ── graphviz missing ────────────────────────────────────────────────────────
+
 
 def test_graphviz_missing_raises_config_error(tmp_path, monkeypatch):
     from tutor.exceptions import ConfigError
@@ -231,6 +238,7 @@ def test_graphviz_missing_raises_config_error(tmp_path, monkeypatch):
 
 
 # ── output filename ─────────────────────────────────────────────────────────
+
 
 def test_output_filename_uses_unit_index(tmp_path):
     spec = _make_spec(unit_index=3, diagram_type="none", analogy="test")

@@ -1,8 +1,8 @@
 import json
 import logging
 import re
-import sys
 import time
+import tomllib
 from pathlib import Path
 
 from openai import OpenAI
@@ -15,14 +15,6 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Config loading — reads tutor/llm_config.toml at import time
 # ---------------------------------------------------------------------------
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    try:
-        import tomli as tomllib          # pip install tomli for Python < 3.11
-    except ImportError as _err:
-        raise ImportError("Python < 3.11 requires 'tomli': pip install tomli") from _err
 
 _CONFIG_PATH = Path(__file__).parent.parent / "llm_config.toml"
 
@@ -54,6 +46,7 @@ _retry_delay_s: float = _cfg["llm"]["retry_delay_s"]
 # Client factory
 # ---------------------------------------------------------------------------
 
+
 def _build_client(provider: str, config: Config) -> OpenAI:
     if provider == "groq":
         if not config.groq_api_key:
@@ -79,6 +72,7 @@ def _build_client(provider: str, config: Config) -> OpenAI:
 # ---------------------------------------------------------------------------
 # Chat
 # ---------------------------------------------------------------------------
+
 
 def chat(
     messages: list[dict],
@@ -127,6 +121,7 @@ def chat(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def parse_json_response(raw: str) -> object:
     text = re.sub(r"```(?:json)?\s*", "", raw).strip().rstrip("`").strip()

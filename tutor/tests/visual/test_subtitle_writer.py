@@ -1,12 +1,9 @@
 import re
 
-import pytest
-
 from tutor.models import DialogueLine
 from tutor.visual.subtitle_writer import (
     _format_timestamp,
     _line_duration,
-    _scale_unit_lines,
     _wrap_subtitle,
     build_srt,
     get_line_start_offsets,
@@ -18,6 +15,7 @@ def _line(speaker: str, text: str, unit: int = 1) -> DialogueLine:
 
 
 # ── SRT format ───────────────────────────────────────────────────────────────
+
 
 def test_srt_numbering_sequential():
     lines = [
@@ -45,6 +43,7 @@ def test_timestamp_hours():
 
 # ── Subtitle wrapping ─────────────────────────────────────────────────────────
 
+
 def test_line_wrap_at_60_chars():
     short = _wrap_subtitle("ALEX", "Short text.")
     assert len(short) <= 60
@@ -52,7 +51,9 @@ def test_line_wrap_at_60_chars():
 
 
 def test_line_wrap_long_text_splits():
-    long_text = "This is an extremely long piece of dialogue that definitely exceeds sixty characters"
+    long_text = (
+        "This is an extremely long piece of dialogue that definitely exceeds sixty characters"
+    )
     result = _wrap_subtitle("MAYA", long_text)
     for segment in result.split("\n"):
         assert len(segment) <= 60
@@ -65,15 +66,16 @@ def test_wrap_preserves_speaker():
 
 # ── Unit duration scaling ─────────────────────────────────────────────────────
 
+
 def test_unit_scaling_when_duration_mismatch():
     lines = [
         _line("ALEX", "One two three four five six seven eight nine ten", 1),
         _line("MAYA", "One two three four five six seven eight nine ten", 1),
     ]
-    estimated = sum(_line_duration(l.text) for l in lines)
+    estimated = sum(_line_duration(ln.text) for ln in lines)
     # Supply actual = 150% of estimated — should scale up
     actual_s = estimated * 1.5
-    srt = build_srt(lines, [actual_s])
+    _srt = build_srt(lines, [actual_s])
     offsets = get_line_start_offsets(lines, [actual_s])
     # The second line's start should be later than without scaling
     offsets_noscale = get_line_start_offsets(lines, [estimated])
@@ -83,13 +85,14 @@ def test_unit_scaling_when_duration_mismatch():
 def test_no_scaling_within_10_percent():
     lines = [_line("ALEX", "Short line", 1)]
     estimated = _line_duration(lines[0].text)
-    actual = estimated * 1.08   # 8% difference, below threshold
+    actual = estimated * 1.08  # 8% difference, below threshold
     offsets_scaled = get_line_start_offsets(lines, [actual])
-    offsets_exact  = get_line_start_offsets(lines, [estimated])
+    offsets_exact = get_line_start_offsets(lines, [estimated])
     assert offsets_scaled[0] == offsets_exact[0]
 
 
 # ── Offset consistency ────────────────────────────────────────────────────────
+
 
 def test_get_line_start_offsets_matches_srt_timestamps():
     lines = [

@@ -1,13 +1,12 @@
 """Tests for tutor/cli/video_commands.py."""
-import io
+
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from tutor.cli.commands import ShellContext
 from tutor.cli.video_commands import (
-    VIDEO_DIR,
     _assert_audio_ready,
     _confirm_overwrite,
     cmd_video,
@@ -23,6 +22,7 @@ def _ctx(**kwargs) -> ShellContext:
 
 
 # ── _assert_audio_ready ──────────────────────────────────────────────────────
+
 
 def test_cmd_video_missing_units_json(tmp_path):
     """Audio dir exists, tutorial_units has MP3s, but no tutorial.units.json → ValueError."""
@@ -58,6 +58,7 @@ def test_assert_audio_ready_no_mp3s(tmp_path):
 
 # ── session context inference ─────────────────────────────────────────────────
 
+
 def test_cmd_video_infers_session_from_context(capsys):
     """ctx.current_session set, no arg → uses it (errors out at audio check)."""
     ctx = _ctx(current_session="week2_3")
@@ -78,6 +79,7 @@ def test_cmd_video_no_session_no_context_prints_usage(capsys):
 
 # ── overwrite prompt ──────────────────────────────────────────────────────────
 
+
 def test_cmd_video_prompts_before_overwrite(tmp_path, capsys):
     """full_session.mp4 exists → ask before overwriting; 'n' → skip."""
     # Set up a fake complete audio session
@@ -93,9 +95,11 @@ def test_cmd_video_prompts_before_overwrite(tmp_path, capsys):
     mp4 = video_dir / "full_session.mp4"
     mp4.touch()
 
-    with patch("tutor.cli.video_commands.AUDIO_DIR", tmp_path / "audio"), \
-         patch("tutor.cli.video_commands.VIDEO_DIR", tmp_path / "video"), \
-         patch("builtins.input", return_value="n"):
+    with (
+        patch("tutor.cli.video_commands.AUDIO_DIR", tmp_path / "audio"),
+        patch("tutor.cli.video_commands.VIDEO_DIR", tmp_path / "video"),
+        patch("builtins.input", return_value="n"),
+    ):
         ctx = _ctx()
         cmd_video(["test_sess"], ctx)
 
@@ -115,12 +119,13 @@ def test_confirm_overwrite_no(monkeypatch):
 
 # ── cmd_vsessions ─────────────────────────────────────────────────────────────
 
+
 def test_sessions_shows_mp4_badge(tmp_path, capsys):
     """Session dir with full_session.mp4 → '[mp4]' in output."""
     sess = tmp_path / "week2_3"
     sess.mkdir()
     mp4 = sess / "full_session.mp4"
-    mp4.write_bytes(b"x" * 1024)   # 1 KB fake MP4
+    mp4.write_bytes(b"x" * 1024)  # 1 KB fake MP4
 
     with patch("tutor.cli.video_commands.VIDEO_DIR", tmp_path):
         cmd_vsessions([], _ctx())
@@ -140,6 +145,7 @@ def test_sessions_no_output_when_empty(tmp_path, capsys):
 
 # ── sessions badge in cmd_sessions ───────────────────────────────────────────
 
+
 def test_sessions_command_shows_mp4_badge(tmp_path, capsys):
     """cmd_sessions shows [mp4] when video/<session>/full_session.mp4 exists."""
     from tutor.cli.commands import cmd_sessions
@@ -154,8 +160,10 @@ def test_sessions_command_shows_mp4_badge(tmp_path, capsys):
     video_dir.mkdir(parents=True)
     (video_dir / "full_session.mp4").touch()
 
-    with patch("tutor.cli.commands.AUDIO_DIR", audio_dir), \
-         patch("tutor.cli.video_commands.VIDEO_DIR", tmp_path / "video"):
+    with (
+        patch("tutor.cli.commands.AUDIO_DIR", audio_dir),
+        patch("tutor.cli.video_commands.VIDEO_DIR", tmp_path / "video"),
+    ):
         cmd_sessions([], _ctx())
 
     out = capsys.readouterr().out
@@ -172,8 +180,10 @@ def test_sessions_no_badge_without_mp4(tmp_path, capsys):
     units_dir.mkdir(parents=True)
     (units_dir / "unit_01.mp3").touch()
 
-    with patch("tutor.cli.commands.AUDIO_DIR", audio_dir), \
-         patch("tutor.cli.video_commands.VIDEO_DIR", tmp_path / "video"):
+    with (
+        patch("tutor.cli.commands.AUDIO_DIR", audio_dir),
+        patch("tutor.cli.video_commands.VIDEO_DIR", tmp_path / "video"),
+    ):
         cmd_sessions([], _ctx())
 
     out = capsys.readouterr().out

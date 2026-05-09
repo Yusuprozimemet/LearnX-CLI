@@ -2,11 +2,12 @@
 Convert a flat list of DialogueLines into a SRT subtitle file.
 No ffmpeg, no Pillow, no LLM calls here.
 """
+
 from tutor.constants import SILENCE_TURN_MS, SILENCE_UNIT_MS, WPM
 from tutor.models import DialogueLine
 
 MIN_LINE_DURATION_S = 1.5
-MAX_SUBTITLE_CHARS  = 60
+MAX_SUBTITLE_CHARS = 60
 
 
 def build_srt(
@@ -19,12 +20,10 @@ def build_srt(
     """
     offsets, durations = _compute_timing(all_lines, unit_durations_s)
     entries: list[str] = []
-    for idx, (line, start, dur) in enumerate(zip(all_lines, offsets, durations), start=1):
+    for idx, (line, start, dur) in enumerate(zip(all_lines, offsets, durations, strict=False), start=1):
         end = start + dur
         text = _wrap_subtitle(line.speaker, line.text)
-        entries.append(
-            f"{idx}\n{_format_timestamp(start)} --> {_format_timestamp(end)}\n{text}\n"
-        )
+        entries.append(f"{idx}\n{_format_timestamp(start)} --> {_format_timestamp(end)}\n{text}\n")
     return "\n".join(entries)
 
 
@@ -38,6 +37,7 @@ def get_line_start_offsets(
 
 
 # ── Internals ────────────────────────────────────────────────────────────────
+
 
 def _compute_timing(
     all_lines: list[DialogueLine],
@@ -63,10 +63,8 @@ def _compute_timing(
             SILENCE_TURN_MS / 1000 * (len(indices) - 1)
         )
         if estimated_s > 0 and abs(estimated_s - actual_s) / estimated_s > 0.10:
-            scaled = _scale_unit_lines(
-                [raw_durations[i] for i in indices], actual_s
-            )
-            for i, d in zip(indices, scaled):
+            scaled = _scale_unit_lines([raw_durations[i] for i in indices], actual_s)
+            for i, d in zip(indices, scaled, strict=False):
                 raw_durations[i] = d
 
     # Build offsets with silence gaps
@@ -100,10 +98,13 @@ def _scale_unit_lines(durations: list[float], actual_s: float) -> list[float]:
 
 
 def _format_timestamp(seconds: float) -> str:
-    ms       = int(round(seconds * 1000))
-    hh       = ms // 3_600_000;  ms -= hh * 3_600_000
-    mm       = ms //    60_000;  ms -= mm *    60_000
-    ss       = ms //     1_000;  ms -= ss *     1_000
+    ms = int(round(seconds * 1000))
+    hh = ms // 3_600_000
+    ms -= hh * 3_600_000
+    mm = ms // 60_000
+    ms -= mm * 60_000
+    ss = ms // 1_000
+    ms -= ss * 1_000
     return f"{hh:02d}:{mm:02d}:{ss:02d},{ms:03d}"
 
 
@@ -121,6 +122,6 @@ def _wrap_subtitle(speaker: str, text: str, max_chars: int = MAX_SUBTITLE_CHARS)
             line1_words.append(word)
         else:
             break
-    remainder = " ".join(words[len(line1_words):])
+    remainder = " ".join(words[len(line1_words) :])
     line1 = prefix + " ".join(line1_words)
     return f"{line1}\n{remainder}" if remainder else line1

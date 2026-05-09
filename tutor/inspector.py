@@ -32,12 +32,17 @@ def report_ingestion(profile: DocProfile, chunks: list[Chunk]) -> None:
 
 def _report_warnings(chunks: list[Chunk]) -> None:
     from tutor.constants import MAX_CHUNK_TOKENS
+
     warnings = []
     for c in chunks:
         if c.token_count > MAX_CHUNK_TOKENS and c.has_code:
-            warnings.append(f"! {c.chunk_id} — code block preserved intact at {c.token_count} tokens (correct behavior).")
+            warnings.append(
+                f"! {c.chunk_id} — code block preserved intact at {c.token_count} tokens (correct behavior)."
+            )
         elif c.token_count > MAX_CHUNK_TOKENS:
-            warnings.append(f"! {c.chunk_id} — {c.token_count} tokens, may produce shallow dialogue.")
+            warnings.append(
+                f"! {c.chunk_id} — {c.token_count} tokens, may produce shallow dialogue."
+            )
 
     if warnings:
         print("\n=== Chunk Quality Warnings ===")
@@ -50,7 +55,9 @@ def _report_orphans(chunks: list[Chunk]) -> None:
     if orphans:
         print("\n=== Orphan Risk ===")
         for c in orphans:
-            print(f"  {c.chunk_id} ({c.token_count} tokens) — small section, may be skipped by planner")
+            print(
+                f"  {c.chunk_id} ({c.token_count} tokens) — small section, may be skipped by planner"
+            )
 
 
 def report_curriculum(
@@ -61,7 +68,7 @@ def report_curriculum(
     print("\n=== Duration Plan ===")
     print(f"Target duration:   {duration_min} min")
     print(f"Word budget:       {duration_min * WPM} words (@ {WPM} WPM)")
-    print(f"Silence overhead:  ~1m 20s")
+    print("Silence overhead:  ~1m 20s")
 
     print("\n=== Teaching Units ===")
     header = f"{'':45} {'Complexity':>10}  {'Words':>7}  {'Est. time'}"
@@ -77,7 +84,7 @@ def report_curriculum(
 
     for u in units:
         secs = u.word_budget * 60 // WPM
-        label = f"Unit {u.unit}  \"{u.concept}\""
+        label = f'Unit {u.unit}  "{u.concept}"'
         print(f"{label:<45} {u.complexity:>10}  {u.word_budget:>7}  {_fmt_time(secs)}")
         total_words += u.word_budget
         total_secs += secs
@@ -96,7 +103,7 @@ def report_curriculum(
     pct = used / len(chunks) * 100 if chunks else 0
     skipped = [c.chunk_id for c in chunks if c.chunk_id not in used_ids]
 
-    print(f"\n=== Coverage ===")
+    print("\n=== Coverage ===")
     print(f"Sections used:     {used}/{len(chunks)} ({pct:.1f}%)")
     if skipped:
         print(f"Sections skipped:  {', '.join(skipped[:8])}")

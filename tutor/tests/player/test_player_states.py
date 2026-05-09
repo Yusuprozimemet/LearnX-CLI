@@ -1,5 +1,7 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from tutor.models import TeachingUnit
 
 
@@ -29,6 +31,7 @@ def player(tmp_path):
         mock_pygame.mixer = MagicMock()
 
         from tutor.player.player import TutorPlayer
+
         p = TutorPlayer(
             unit_files=[str(fake_mp3)],
             units=[_make_unit()],

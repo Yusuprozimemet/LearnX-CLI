@@ -1,10 +1,12 @@
 from pathlib import Path
 
+import pytest
+
 from tutor.models import DialogueLine, VisualSpec
 from tutor.visual.beat_timer import (
+    MIN_SLIDE_DURATION,
     OUTRO_CARD_DURATION,
     TITLE_CARD_DURATION,
-    MIN_SLIDE_DURATION,
     compute_slide_timings,
 )
 
@@ -15,13 +17,15 @@ def _line(speaker: str, unit: int) -> DialogueLine:
 
 def _unit_spec(idx: int) -> VisualSpec:
     return VisualSpec(
-        unit_index=idx, slide_type="unit", concept=f"Concept {idx}",
+        unit_index=idx,
+        slide_type="unit",
+        concept=f"Concept {idx}",
         memory_hook="remember this",
     )
 
 
 def _slides(n_units: int) -> list[Path]:
-    paths = [Path(f"slides/00_title.png")]
+    paths = [Path("slides/00_title.png")]
     for i in range(1, n_units + 1):
         paths += [
             Path(f"slides/{i:02d}_hook.png"),
@@ -65,8 +69,11 @@ def test_outro_card_fixed_6_seconds():
 def test_hook_slide_assigned_to_first_alex_line():
     script = [_line("ALEX", 1), _line("MAYA", 1), _line("ALEX", 1)]
     offsets = [2.0, 10.0, 20.0]
-    visuals = [VisualSpec(unit_index=0, slide_type="title_card"), _unit_spec(1),
-               VisualSpec(unit_index=2, slide_type="outro")]
+    visuals = [
+        VisualSpec(unit_index=0, slide_type="title_card"),
+        _unit_spec(1),
+        VisualSpec(unit_index=2, slide_type="outro"),
+    ]
     slides = _slides(1)
     timings = compute_slide_timings(slides, script, offsets, visuals, [30.0])
 
@@ -78,8 +85,11 @@ def test_hook_slide_assigned_to_first_alex_line():
 def test_concept_slide_assigned_to_first_maya_line():
     script = [_line("ALEX", 1), _line("MAYA", 1), _line("ALEX", 1)]
     offsets = [2.0, 10.0, 20.0]
-    visuals = [VisualSpec(unit_index=0, slide_type="title_card"), _unit_spec(1),
-               VisualSpec(unit_index=2, slide_type="outro")]
+    visuals = [
+        VisualSpec(unit_index=0, slide_type="title_card"),
+        _unit_spec(1),
+        VisualSpec(unit_index=2, slide_type="outro"),
+    ]
     slides = _slides(1)
     timings = compute_slide_timings(slides, script, offsets, visuals, [30.0])
 
@@ -92,8 +102,11 @@ def test_minimum_slide_duration_enforced():
     # All lines packed into 1 second — every slide should be clamped to MIN
     script = [_line("ALEX", 1), _line("MAYA", 1), _line("ALEX", 1)]
     offsets = [0.0, 0.1, 0.2]
-    visuals = [VisualSpec(unit_index=0, slide_type="title_card"), _unit_spec(1),
-               VisualSpec(unit_index=2, slide_type="outro")]
+    visuals = [
+        VisualSpec(unit_index=0, slide_type="title_card"),
+        _unit_spec(1),
+        VisualSpec(unit_index=2, slide_type="outro"),
+    ]
     slides = _slides(1)
     timings = compute_slide_timings(slides, script, offsets, visuals, [0.3])
 
@@ -102,5 +115,3 @@ def test_minimum_slide_duration_enforced():
             continue
         assert dur >= MIN_SLIDE_DURATION
 
-
-import pytest
