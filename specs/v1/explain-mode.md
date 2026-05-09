@@ -1,4 +1,4 @@
-# v1 — Explain Mode (`--explain`)
+# v1 — Explain Mode (`--explain`) — **Implemented** (commit d601cef)
 
 ## What works at the end of this feature
 

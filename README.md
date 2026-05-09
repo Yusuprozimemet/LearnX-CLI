@@ -187,11 +187,13 @@ LearnX [▶ 2/5  Pass-by-Value] > /ask what is the difference between == and .eq
 
 | Flag | Default | Description |
 |---|---|---|
-| `--duration N` | `20` | Target session length in minutes |
-| `--difficulty LEVEL` | `beginner` | `beginner` / `intermediate` / `advanced` |
-| `--format FORMAT` | `tutor-student` | `tutor-student` or `dual-tutor` |
-| `--topic TEXT` | — | Force a specific concept into the curriculum |
-| `--units N` | auto | Cap the number of teaching units |
+| `--explain` | — | Read-along mode: narrate document top-to-bottom (one unit per heading) |
+| `--conversation` | default | Concept-driven dialogue mode (can be omitted) |
+| `--duration N` | `20` | Target session length in minutes (conversation only) |
+| `--difficulty LEVEL` | `beginner` | `beginner` / `intermediate` / `advanced` (conversation only) |
+| `--format FORMAT` | `tutor-student` | `tutor-student` or `dual-tutor` (conversation only) |
+| `--topic TEXT` | — | Force a specific concept into the curriculum (conversation only) |
+| `--units N` | auto | Cap the number of teaching units (conversation only) |
 | `--provider NAME` | `groq` | `groq` or `openrouter` |
 | `--no-cache` | — | Clear cached summaries and regenerate |
 | `--script-only` | — | Print dialogue script; skip audio |
@@ -225,12 +227,33 @@ LearnX [▶ 2/5  Pass-by-Value] > /ask what is the difference between == and .eq
 
 The video is written to `video/<session>/full_session.mp4`.
 
+### Read-along (explain mode)
+
+Scroll through the document while ALEX narrates each section top to bottom.
+
+```
+/generate week2/2.md --explain
+/play week2_2_explain
+/next
+/ask what does static mean here?
+/stop
+```
+
 ### Inspect without generating
 
 ```
 /inspect notes.md
 /dry-run notes.md --difficulty advanced
 ```
+
+---
+
+## Generation modes
+
+| Mode | Flag | What it does |
+|---|---|---|
+| **Conversation** | (default) | LLM picks key traps and misconceptions; generates tutor–student dialogue |
+| **Explain** | `--explain` | Narrates every section top-to-bottom as an ALEX monologue — ideal for reading along |
 
 ---
 
@@ -251,13 +274,15 @@ All model names, token budgets, and call settings live in one file. No Python ed
 ```toml
 [providers.groq]
 curriculum = "llama-3.3-70b-versatile"
-dialogue   = "llama-3.1-8b-instant"
+dialogue   = "llama-3.3-70b-versatile"
+summarize  = "llama-3.1-8b-instant"
+qa         = "llama-3.1-8b-instant"
 
 [max_tokens]
-dialogue = 1500
+dialogue = 2000
 
 [limits]
-max_source_tokens = 1500   # raise on paid tier
+max_source_tokens = 3000   # raise on paid tier
 
 [llm]
 temperature   = 0.7
@@ -266,7 +291,7 @@ retry_count   = 2
 
 | Provider | Models | Notes |
 |---|---|---|
-| `groq` (default) | `llama-3.3-70b` (curriculum), `llama-3.1-8b` (dialogue, Q&A) | Free tier, fast |
+| `groq` (default) | `llama-3.3-70b` (curriculum, dialogue), `llama-3.1-8b` (summarize, Q&A) | Free tier, fast |
 | `openrouter` | `gemma-3-27b`, `llama-3.1-8b` (free tier) | Fallback option |
 
 ---
@@ -327,7 +352,7 @@ Press `/ask` at any point during playback:
 python -m pytest
 ```
 
-220 tests across ingestion, generation, audio, player, visual, and CLI modules. No API keys required — all LLM calls are mocked.
+235 tests across ingestion, generation, audio, player, visual, and CLI modules. No API keys required — all LLM calls are mocked.
 
 ---
 
