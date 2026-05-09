@@ -11,6 +11,7 @@ from tutor.models import VisualSpec
 
 # ── VideoError ────────────────────────────────────────────────────────────────
 
+
 def test_video_error_is_tutor_error():
     assert issubclass(VideoError, TutorError)
 
@@ -43,6 +44,7 @@ def test_video_error_not_same_as_llm_error():
 
 
 # ── VisualSpec — defaults ─────────────────────────────────────────────────────
+
 
 def test_visual_spec_minimal_construction():
     spec = VisualSpec(unit_index=1, slide_type="unit")
@@ -167,8 +169,12 @@ def test_visual_spec_code_comparison_diagram_spec():
         unit_index=1,
         slide_type="unit",
         diagram_type="code_comparison",
-        diagram_spec={"wrong": "a == b", "right": "a.equals(b)",
-                      "label_wrong": "ref check", "label_right": "content check"},
+        diagram_spec={
+            "wrong": "a == b",
+            "right": "a.equals(b)",
+            "label_wrong": "ref check",
+            "label_right": "content check",
+        },
     )
     assert isinstance(spec.diagram_spec, dict)
     assert "wrong" in spec.diagram_spec

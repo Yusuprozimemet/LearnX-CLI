@@ -13,6 +13,7 @@ from tutor.visual import _doc_title_from_units, _format_duration, _load_all_line
 
 # ── _doc_title_from_units ────────────────────────────────────────────────────
 
+
 def test_doc_title_returns_first_concept(tmp_path):
     units_json = tmp_path / "tutorial.units.json"
     units_json.write_text(
@@ -47,6 +48,7 @@ def test_doc_title_uses_concept_key(tmp_path):
 
 
 # ── _load_all_lines — from units JSON lines field ────────────────────────────
+
 
 def test_load_all_lines_from_units_json(tmp_path):
     units_json = tmp_path / "tutorial.units.json"
@@ -94,6 +96,7 @@ def test_load_all_lines_from_multiple_units(tmp_path):
 
 
 # ── _load_all_lines — fallback to tutorial.script.txt ───────────────────────
+
 
 def test_load_all_lines_fallback_to_script_txt(tmp_path):
     """No 'lines' in JSON → falls back to tutorial.script.txt."""
@@ -167,8 +170,8 @@ def test_load_all_lines_script_assigns_units_sequentially(tmp_path):
     assert len(unit_numbers) >= 1
 
 
-
 # ── _mp3_duration ─────────────────────────────────────────────────────────────
+
 
 def test_mp3_duration_returns_float_on_success(monkeypatch, tmp_path):
     fake_mp3 = tmp_path / "unit_01.mp3"
@@ -217,6 +220,7 @@ def test_mp3_duration_returns_zero_on_timeout(monkeypatch, tmp_path):
 
 # ── _format_duration ─────────────────────────────────────────────────────────
 
+
 def test_format_duration_zero():
     assert _format_duration(0) == "0:00"
 
@@ -244,8 +248,10 @@ def test_format_duration_fractional_truncated():
 
 # ── _UNIT_MP3_RE ──────────────────────────────────────────────────────────────
 
+
 def test_unit_mp3_re_matches_valid_stems():
     from tutor.visual import _UNIT_MP3_RE
+
     assert _UNIT_MP3_RE.match("unit_01")
     assert _UNIT_MP3_RE.match("unit_10")
     assert _UNIT_MP3_RE.match("unit_99")
@@ -253,10 +259,12 @@ def test_unit_mp3_re_matches_valid_stems():
 
 def test_unit_mp3_re_rejects_intro():
     from tutor.visual import _UNIT_MP3_RE
+
     assert _UNIT_MP3_RE.match("unit_00_intro") is None
 
 
 def test_unit_mp3_re_rejects_non_unit_names():
     from tutor.visual import _UNIT_MP3_RE
+
     assert _UNIT_MP3_RE.match("tutorial") is None
     assert _UNIT_MP3_RE.match("outro") is None

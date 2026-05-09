@@ -35,6 +35,7 @@ from tutor.visual.slide_theme import (
 
 # ── Constants sanity checks ──────────────────────────────────────────────────
 
+
 def test_canvas_dimensions():
     assert CANVAS_W == 1920
     assert CANVAS_H == 1080
@@ -62,8 +63,16 @@ def test_diagram_area_within_canvas():
 def test_colour_strings_are_hex():
     """All colour constants should be valid #rrggbb hex strings."""
     colours = [
-        BG_DEEP, BG_CARD, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_CODE,
-        ACCENT_CYAN, ACCENT_GREEN, ACCENT_AMBER, ACCENT_RED, DIVIDER,
+        BG_DEEP,
+        BG_CARD,
+        TEXT_PRIMARY,
+        TEXT_SECONDARY,
+        TEXT_CODE,
+        ACCENT_CYAN,
+        ACCENT_GREEN,
+        ACCENT_AMBER,
+        ACCENT_RED,
+        DIVIDER,
     ]
     for c in colours:
         assert c.startswith("#"), f"{c!r} does not start with '#'"
@@ -77,6 +86,7 @@ def test_bullet_area_widths():
 
 
 # ── _load_font ───────────────────────────────────────────────────────────────
+
 
 def test_load_font_returns_a_font():
     font = _load_font(24)
@@ -111,16 +121,20 @@ def test_load_font_never_raises_for_any_size():
 def test_load_font_falls_back_when_primary_missing(monkeypatch):
     """When bundled font paths are missing, falls back gracefully."""
     from tutor.visual import slide_theme
+
     monkeypatch.setattr(slide_theme, "_SANS_REGULAR", Path("/nonexistent/Inter-Regular.ttf"))
-    monkeypatch.setattr(slide_theme, "_SANS_BOLD",    Path("/nonexistent/Inter-Bold.ttf"))
-    monkeypatch.setattr(slide_theme, "_MONO_REGULAR", Path("/nonexistent/JetBrainsMono-Regular.ttf"))
-    monkeypatch.setattr(slide_theme, "_MONO_BOLD",    Path("/nonexistent/JetBrainsMono-Bold.ttf"))
+    monkeypatch.setattr(slide_theme, "_SANS_BOLD", Path("/nonexistent/Inter-Bold.ttf"))
+    monkeypatch.setattr(
+        slide_theme, "_MONO_REGULAR", Path("/nonexistent/JetBrainsMono-Regular.ttf")
+    )
+    monkeypatch.setattr(slide_theme, "_MONO_BOLD", Path("/nonexistent/JetBrainsMono-Bold.ttf"))
 
     font = _load_font(24)
     assert font is not None
 
 
 # ── wrap_text ────────────────────────────────────────────────────────────────
+
 
 def _make_draw() -> ImageDraw.ImageDraw:
     return ImageDraw.Draw(Image.new("RGB", (CANVAS_W, CANVAS_H)))
@@ -152,7 +166,9 @@ def test_wrap_text_each_line_within_pixel_width():
     draw = _make_draw()
     font = _load_font(36)
     max_w = 400
-    text = "Interfaces define a contract between a class and the outside world and must be implemented"
+    text = (
+        "Interfaces define a contract between a class and the outside world and must be implemented"
+    )
     lines = wrap_text(draw, text, font, max_w)
     for line in lines:
         bbox = draw.textbbox((0, 0), line, font=font)

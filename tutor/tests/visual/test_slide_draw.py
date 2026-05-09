@@ -1,4 +1,5 @@
 """Tests for tutor/visual/slide_draw.py — drawing primitives."""
+
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -43,6 +44,7 @@ def _hex_to_rgb(hex_colour: str) -> tuple[int, int, int]:
 
 # ── draw_background ──────────────────────────────────────────────────────────
 
+
 def test_draw_background_fills_canvas():
     img, _ = _new_canvas()
     # Set to white first, then overwrite with draw_background
@@ -61,6 +63,7 @@ def test_draw_background_custom_colour():
 
 
 # ── draw_accent_strip ─────────────────────────────────────────────────────────
+
 
 def test_draw_accent_strip_default_cyan():
     img, draw = _new_canvas()
@@ -93,6 +96,7 @@ def test_draw_accent_strip_width_is_accent_strip_w():
 
 # ── draw_top_bar ─────────────────────────────────────────────────────────────
 
+
 def test_draw_top_bar_does_not_crash():
     img, draw = _new_canvas()
     draw_background(img)
@@ -109,6 +113,7 @@ def test_draw_top_bar_modifies_image():
 
 
 # ── draw_footer_bar ───────────────────────────────────────────────────────────
+
 
 def test_draw_footer_bar_paints_footer_area():
     img, draw = _new_canvas()
@@ -137,6 +142,7 @@ def test_draw_footer_bar_empty_string_does_not_crash():
 
 # ── draw_concept_title ────────────────────────────────────────────────────────
 
+
 def test_draw_concept_title_modifies_title_area():
     img, draw = _new_canvas()
     draw_background(img)
@@ -154,10 +160,12 @@ def test_draw_concept_title_empty_string_ok():
 
 # ── draw_divider ──────────────────────────────────────────────────────────────
 
+
 def test_draw_divider_default_cyan():
     img, draw = _new_canvas()
     draw_background(img)
     from tutor.visual.slide_theme import DIVIDER_Y
+
     draw_divider(draw)
     # Sample a pixel on the divider line at CONTENT_LEFT + 10
     px = img.getpixel((CONTENT_LEFT + 100, DIVIDER_Y))
@@ -168,12 +176,14 @@ def test_draw_divider_custom_colour():
     img, draw = _new_canvas()
     draw_background(img)
     from tutor.visual.slide_theme import DIVIDER_Y
+
     draw_divider(draw, colour=ACCENT_AMBER)
     px = img.getpixel((CONTENT_LEFT + 100, DIVIDER_Y))
     assert px == _hex_to_rgb(ACCENT_AMBER)
 
 
 # ── draw_bullets ──────────────────────────────────────────────────────────────
+
 
 def test_draw_bullets_returns_int():
     img, draw = _new_canvas()
@@ -210,6 +220,7 @@ def test_draw_bullets_empty_list_does_not_crash():
 
 # ── draw_code_block ───────────────────────────────────────────────────────────
 
+
 def test_draw_code_block_returns_int():
     img, draw = _new_canvas()
     draw_background(img)
@@ -222,7 +233,7 @@ def test_draw_code_block_modifies_canvas():
     img, draw = _new_canvas()
     draw_background(img)
     before = list(img.getdata())
-    draw_code_block(img, draw, "String s = \"Hello\";", 400)
+    draw_code_block(img, draw, 'String s = "Hello";', 400)
     after = list(img.getdata())
     assert before != after
 
@@ -241,6 +252,7 @@ def test_draw_code_block_empty_string_ok():
 
 
 # ── paste_diagram ─────────────────────────────────────────────────────────────
+
 
 def test_paste_diagram_places_image(tmp_path):
     img, _ = _new_canvas()
@@ -278,6 +290,7 @@ def test_paste_diagram_scales_down_large_image(tmp_path):
 
 
 # ── draw_logo ─────────────────────────────────────────────────────────────────
+
 
 def test_draw_logo_paints_top_right():
     img, draw = _new_canvas()

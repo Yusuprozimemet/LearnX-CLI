@@ -1,4 +1,5 @@
 """Tests for tutor/assets/__init__.py — path constants."""
+
 from pathlib import Path
 
 from tutor.assets import ASSETS_DIR, FONTS_DIR, LOGO_PATH
