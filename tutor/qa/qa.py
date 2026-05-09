@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 from tutor.exceptions import LLMError
+from tutor.infra.llm import LLMFn
 from tutor.models import Chunk, QAExchange, SessionLog, TeachingUnit
 
 log = logging.getLogger(__name__)
@@ -16,7 +17,7 @@ def answer(
     current_unit: TeachingUnit,
     all_chunks: list[Chunk],
     session: SessionLog,
-    llm_fn,
+    llm_fn: LLMFn,
     position_seconds: int = 0,
 ) -> str:
     context = _build_context(current_unit, all_chunks, session)

@@ -7,9 +7,9 @@ import json
 import logging
 import re
 import subprocess
-from collections.abc import Callable
 from pathlib import Path
 
+from tutor.infra.llm import LLMFn
 from tutor.models import DialogueLine
 
 _UNIT_MP3_RE = re.compile(r"^unit_\d+$")  # matches unit_01, unit_02 — not unit_00_intro
@@ -21,7 +21,7 @@ def run_visual_pipeline(
     session: str,
     audio_dir: Path,
     video_dir: Path,
-    llm_fn: Callable,
+    llm_fn: LLMFn,
     difficulty: str = "beginner",
     no_cache: bool = False,
 ) -> Path:

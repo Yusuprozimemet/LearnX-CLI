@@ -71,7 +71,7 @@ FONT_SANS_FALLBACK = ["Segoe UI", "Arial", "DejaVu Sans"]
 FONT_MONO_FALLBACK = ["Consolas", "Courier New", "DejaVu Sans Mono"]
 
 
-def _load_font(size: int, bold: bool = False, mono: bool = False) -> ImageFont.ImageFont:
+def _load_font(size: int, bold: bool = False, mono: bool = False) -> ImageFont.ImageFont | ImageFont.FreeTypeFont:
     """
     Try bundled TTF → Windows system path → name-based → bitmap default.
     Never raises.
@@ -112,7 +112,7 @@ def _load_font(size: int, bold: bool = False, mono: bool = False) -> ImageFont.I
 def wrap_text(
     draw: ImageDraw.ImageDraw,
     text: str,
-    font: ImageFont.ImageFont,
+    font: ImageFont.ImageFont | ImageFont.FreeTypeFont,
     max_width: int,
 ) -> list[str]:
     """Split text into lines that each fit within max_width pixels."""

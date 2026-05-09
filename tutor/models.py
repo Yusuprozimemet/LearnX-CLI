@@ -88,7 +88,7 @@ class VisualSpec:
     key_points: list[str] = field(default_factory=list)
     code_snippet: str | None = None
     diagram_type: str = "none"
-    diagram_spec: object = None  # str (DOT) | dict | None
+    diagram_spec: str | dict[str, object] | None = None
     memory_hook: str = ""
     analogy: str = ""
     # title_card fields

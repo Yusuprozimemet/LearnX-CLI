@@ -6,7 +6,7 @@ from pathlib import Path
 
 from tutor.constants import PROMPT_VERSION, SUMMARY_CACHE_DIR
 from tutor.exceptions import LLMError
-from tutor.infra.llm import LIMITS, load_prompt
+from tutor.infra.llm import LIMITS, LLMFn, load_prompt
 from tutor.models import Chunk, DialogueLine, TeachingUnit
 
 log = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ def generate(
     unit: TeachingUnit,
     source_chunks: list[Chunk],
     fmt: str,
-    llm_fn,
+    llm_fn: LLMFn,
     difficulty: str = "beginner",
     cache_dir: str = SUMMARY_CACHE_DIR,
 ) -> list[DialogueLine]:

@@ -1,13 +1,12 @@
 import hashlib
 import json
 import logging
-from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
 
 from tutor.constants import SUMMARY_CACHE_DIR
 from tutor.exceptions import LLMError
-from tutor.infra.llm import load_prompt, parse_json_response
+from tutor.infra.llm import LLMFn, load_prompt, parse_json_response
 from tutor.models import TeachingUnit, VisualSpec
 
 log = logging.getLogger(__name__)
@@ -22,7 +21,7 @@ def plan_visuals(
     units_json_path: Path,
     doc_title: str,
     session: str,
-    llm_fn: Callable,
+    llm_fn: LLMFn,
     difficulty: str,
     video_dir: Path,
     no_cache: bool = False,
@@ -58,7 +57,7 @@ def plan_visuals(
 
 def _plan_unit(
     unit: TeachingUnit,
-    llm_fn: Callable,
+    llm_fn: LLMFn,
     difficulty: str,
     cache_file: Path,
 ) -> VisualSpec:
@@ -135,7 +134,7 @@ def _parse_visual_response(raw: str, unit: TeachingUnit) -> VisualSpec:
         key_points=list(data.get("key_points", unit.key_facts[:5])),
         code_snippet=data.get("code_snippet") or None,
         diagram_type=diagram_type,
-        diagram_spec=diagram_spec,
+        diagram_spec=diagram_spec,  # type: ignore[arg-type]
         memory_hook=str(data.get("memory_hook", unit.memory_hook)),
         analogy=unit.good_analogy,
     )

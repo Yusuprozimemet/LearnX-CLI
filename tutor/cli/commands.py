@@ -1,11 +1,18 @@
+from __future__ import annotations
+
 import argparse
 import logging
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING, TypeAlias
 
 from tutor.cli import theme
+
+if TYPE_CHECKING:
+    from tutor.player.player import TutorPlayer
 
 log = logging.getLogger(__name__)
 
@@ -14,7 +21,7 @@ AUDIO_DIR = Path("audio")
 
 @dataclass
 class ShellContext:
-    player: object = None  # TutorPlayer | None
+    player: TutorPlayer | None = None
     player_thread: threading.Thread | None = None
     last_units_dir: Path | None = None
     current_session: str | None = None
@@ -47,7 +54,10 @@ def _get_flag(tokens: list[str], flag: str, default: str) -> str:
         return default
 
 
-def _parse_generate_args(tokens: list[str]):
+CommandFn: TypeAlias = Callable[[list[str], ShellContext], None]
+
+
+def _parse_generate_args(tokens: list[str]) -> argparse.Namespace | None:
     from tutor.tutor import _make_generate_parser
 
     parser = _make_generate_parser()
@@ -57,7 +67,7 @@ def _parse_generate_args(tokens: list[str]):
         return None
 
 
-def _apply_log_level(args) -> None:
+def _apply_log_level(args: argparse.Namespace) -> None:
     import logging as _logging
 
     if getattr(args, "debug", False):
@@ -257,6 +267,7 @@ def cmd_pause(tokens: list[str], ctx: ShellContext) -> None:
     """Usage: /pause — pause playback"""
     if not _require_player(ctx):
         return
+    assert ctx.player is not None
     if ctx.player._state != "PLAYING":
         print(theme.yellow("  Not currently playing."))
         return
@@ -268,6 +279,7 @@ def cmd_resume(tokens: list[str], ctx: ShellContext) -> None:
     """Usage: /resume — resume playback"""
     if not _require_player(ctx):
         return
+    assert ctx.player is not None
     if ctx.player._state != "PAUSED":
         print(theme.yellow("  Not paused."))
         return
@@ -279,6 +291,7 @@ def cmd_stop(tokens: list[str], ctx: ShellContext) -> None:
     """Usage: /stop — stop playback and unload the player"""
     if not _require_player(ctx):
         return
+    assert ctx.player is not None
     ctx.player._quit()
     if ctx.player_thread:
         ctx.player_thread.join(timeout=3.0)
@@ -291,6 +304,7 @@ def cmd_next(tokens: list[str], ctx: ShellContext) -> None:
     """Usage: /next — jump to the next unit"""
     if not _require_player(ctx):
         return
+    assert ctx.player is not None
     ctx.player._next_unit()
 
 
@@ -298,6 +312,7 @@ def cmd_prev(tokens: list[str], ctx: ShellContext) -> None:
     """Usage: /prev — jump to the previous unit"""
     if not _require_player(ctx):
         return
+    assert ctx.player is not None
     ctx.player._prev_unit()
 
 
@@ -305,6 +320,7 @@ def cmd_replay(tokens: list[str], ctx: ShellContext) -> None:
     """Usage: /replay — replay the current unit from the beginning"""
     if not _require_player(ctx):
         return
+    assert ctx.player is not None
     ctx.player._replay_unit()
 
 
@@ -313,6 +329,7 @@ def cmd_ask(tokens: list[str], ctx: ShellContext) -> None:
     If question is provided inline, skips the prompt. Pauses audio while answering."""
     if not _require_player(ctx, require_unit=True):
         return
+    assert ctx.player is not None
 
     was_playing = ctx.player._state == "PLAYING"
     if was_playing:
@@ -341,6 +358,7 @@ def cmd_summary(tokens: list[str], ctx: ShellContext) -> None:
     """Usage: /summary — print the current unit summary and memory hook"""
     if not _require_player(ctx, require_unit=True):
         return
+    assert ctx.player is not None
     ctx.player._print_summary()
 
 
@@ -515,7 +533,7 @@ def cmd_help(tokens: list[str], ctx: ShellContext) -> None:
 # Dispatch table
 # ---------------------------------------------------------------------------
 
-COMMAND_MAP: dict[str, object] = {
+COMMAND_MAP: dict[str, CommandFn | None] = {
     "/generate": cmd_generate,
     "/gen": cmd_generate,
     "/sessions": cmd_sessions,

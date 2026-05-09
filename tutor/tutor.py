@@ -8,6 +8,10 @@ import sys
 from dataclasses import asdict
 from functools import partial
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from tutor.player.player import TutorPlayer
 
 from tutor import inspector
 from tutor.audio import audio_builder
@@ -23,7 +27,7 @@ from tutor.exceptions import TutorError
 from tutor.generation import assembler, curriculum, dialogue
 from tutor.infra import llm
 from tutor.ingestion import chunker, doc_analyzer, summarizer
-from tutor.models import DialogueLine, TeachingUnit
+from tutor.models import Chunk, DialogueLine, DocProfile, TeachingUnit
 
 
 def main() -> None:
@@ -85,7 +89,7 @@ def _run_play() -> None:
         sys.exit(1)
 
 
-def cmd_generate(args) -> None:
+def cmd_generate(args: argparse.Namespace) -> None:
     mode = _mode(args)
     config = preflight(args.input, args.provider, mode)
     llm_fn = partial(llm.chat, provider=args.provider, config=config)
@@ -133,7 +137,7 @@ def cmd_generate(args) -> None:
         cmd_play(args)
 
 
-def _run_inspect(args, profile, chunks) -> None:
+def _run_inspect(args: argparse.Namespace, profile: DocProfile, chunks: list[Chunk]) -> None:
     inspector.report_ingestion(profile, chunks)
     if args.show_summaries:
         for c in chunks:
@@ -145,13 +149,13 @@ def _run_script_only(script: list[DialogueLine]) -> None:
         print(f"{line.speaker}: {line.text}")
 
 
-def _save_chunks(chunks, output_path: str) -> None:
+def _save_chunks(chunks: list[Chunk], output_path: str) -> None:
     chunks_path = Path(output_path).parent / "tutorial.chunks.json"
     with open(chunks_path, "w", encoding="utf-8") as f:
         json.dump([asdict(c) for c in chunks], f, indent=2, ensure_ascii=False)
 
 
-def _run_audio(args, units: list[TeachingUnit], script: list[DialogueLine]) -> None:
+def _run_audio(args: argparse.Namespace, units: list[TeachingUnit], script: list[DialogueLine]) -> None:
     script_path = Path(args.output).with_suffix(".script.txt")
     units_dir = str(Path(args.output).parent / "tutorial_units")
 
@@ -174,12 +178,12 @@ def _run_audio(args, units: list[TeachingUnit], script: list[DialogueLine]) -> N
     print(f"  Meta:   {units_json_path}")
 
 
-def cmd_play(args) -> None:
+def cmd_play(args: argparse.Namespace) -> None:
     player = _build_player(args)
     player.run()
 
 
-def _build_player(args):
+def _build_player(args: argparse.Namespace) -> "TutorPlayer":
     """Build and return a configured TutorPlayer without starting it."""
     import json
     from datetime import datetime
@@ -292,7 +296,7 @@ def _make_generate_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _mode(args) -> str:
+def _mode(args: argparse.Namespace) -> str:
     if getattr(args, "inspect", False):
         return "inspect"
     if getattr(args, "dry_run", False):
@@ -313,7 +317,7 @@ def _print_duration_estimate(script: list[DialogueLine]) -> None:
     print(f"Estimated:     ~{mins}m {secs:02d}s (incl. pauses)")
 
 
-def _setup_logging(args) -> None:
+def _setup_logging(args: argparse.Namespace) -> None:
     if getattr(args, "debug", False):
         level = logging.DEBUG
         logging.basicConfig(

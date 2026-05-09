@@ -5,6 +5,7 @@ import sys
 import tempfile
 from pathlib import Path
 from subprocess import DEVNULL
+from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -152,7 +153,7 @@ def _check_graphviz() -> None:
 # ── Pillow renderers ───────────────────────────────────────────────────────
 
 
-def _render_code_comparison(spec_dict: dict, output_path: Path) -> Path:
+def _render_code_comparison(spec_dict: dict[str, Any], output_path: Path) -> Path:
     img = Image.new("RGB", (DIAGRAM_W, CODE_COMP_H), BG_CARD)
     draw = ImageDraw.Draw(img)
 
@@ -165,14 +166,14 @@ def _render_code_comparison(spec_dict: dict, output_path: Path) -> Path:
     draw.line([(col_w, 0), (col_w, CODE_COMP_H)], fill=COL_DIVIDER, width=1)
 
     # Left column — wrong
-    draw.rectangle([0, 0, col_w - 1, 32], fill=BG_WRONG)
+    draw.rectangle((0, 0, col_w - 1, 32), fill=BG_WRONG)
     draw.text((12, 7), "WRONG", font=font_hdr, fill=COL_WRONG)
     _draw_code_block(draw, spec_dict.get("wrong", ""), font_code, x=12, y=44)
     if lbl := spec_dict.get("label_wrong", ""):
         draw.text((12, CODE_COMP_H - 26), lbl, font=font_label, fill=TEXT_SEC)
 
     # Right column — correct
-    draw.rectangle([col_w, 0, DIAGRAM_W - 1, 32], fill=BG_RIGHT)
+    draw.rectangle((col_w, 0, DIAGRAM_W - 1, 32), fill=BG_RIGHT)
     draw.text((col_w + 12, 7), "CORRECT", font=font_hdr, fill=COL_RIGHT)
     _draw_code_block(draw, spec_dict.get("right", ""), font_code, x=col_w + 12, y=44)
     if lbl := spec_dict.get("label_right", ""):
@@ -186,7 +187,7 @@ def _render_analogy_fallback(analogy: str, output_path: Path) -> Path:
     img = Image.new("RGB", (DIAGRAM_W, ANALOGY_H), BG_CARD)
     draw = ImageDraw.Draw(img)
 
-    draw.rectangle([0, 0, 7, ANALOGY_H], fill=COL_CYAN)  # left accent stripe
+    draw.rectangle((0, 0, 7, ANALOGY_H), fill=COL_CYAN)  # left accent stripe
 
     font_quote = _load_font(72, bold=True)
     font_body = _load_font(26)
@@ -210,13 +211,13 @@ def _render_analogy_fallback(analogy: str, output_path: Path) -> Path:
 # ── Helpers ────────────────────────────────────────────────────────────────
 
 
-def _draw_code_block(draw: ImageDraw.ImageDraw, code: str, font, x: int, y: int) -> None:
+def _draw_code_block(draw: ImageDraw.ImageDraw, code: str, font: ImageFont.ImageFont | ImageFont.FreeTypeFont, x: int, y: int) -> None:
     for line in code.split("\n")[:8]:
         draw.text((x, y), line, font=font, fill=TEXT_PRI)
         y += 22
 
 
-def _load_font(size: int, bold: bool = False, mono: bool = False) -> ImageFont.ImageFont:
+def _load_font(size: int, bold: bool = False, mono: bool = False) -> ImageFont.ImageFont | ImageFont.FreeTypeFont:
     if mono:
         names = ["Consolas", "Courier New", "DejaVu Sans Mono"]
     elif bold:
@@ -232,7 +233,9 @@ def _load_font(size: int, bold: bool = False, mono: bool = False) -> ImageFont.I
 
 
 def _wrap(text: str, max_chars: int = 56) -> list[str]:
-    words, lines, current = text.split(), [], []
+    words: list[str] = text.split()
+    lines: list[str] = []
+    current: list[str] = []
     for word in words:
         if len(" ".join(current + [word])) <= max_chars:
             current.append(word)

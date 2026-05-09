@@ -3,7 +3,9 @@ import logging
 import re
 import time
 import tomllib
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any, TypeAlias
 
 from openai import OpenAI
 
@@ -12,6 +14,8 @@ from tutor.exceptions import ConfigError, LLMError
 
 log = logging.getLogger(__name__)
 
+LLMFn: TypeAlias = Callable[..., str]
+
 # ---------------------------------------------------------------------------
 # Config loading — reads tutor/llm_config.toml at import time
 # ---------------------------------------------------------------------------
@@ -19,7 +23,7 @@ log = logging.getLogger(__name__)
 _CONFIG_PATH = Path(__file__).parent.parent / "llm_config.toml"
 
 
-def _load() -> dict:
+def _load() -> dict[str, Any]:
     with open(_CONFIG_PATH, "rb") as fh:
         return tomllib.load(fh)
 
@@ -75,7 +79,7 @@ def _build_client(provider: str, config: Config) -> OpenAI:
 
 
 def chat(
-    messages: list[dict],
+    messages: list[dict[str, str]],
     config: Config,
     provider: str = "groq",
     call_type: str = "dialogue",
@@ -93,11 +97,12 @@ def chat(
         try:
             response = client.chat.completions.create(
                 model=model,
-                messages=messages,
+                messages=messages,  # type: ignore[arg-type]
                 temperature=_temperature,
                 max_tokens=max_tokens,
             )
             content = response.choices[0].message.content
+            assert content is not None, "LLM returned empty content"
             log.debug("LLM response (first 200 chars): %s", content[:200])
             return content
         except Exception as e:

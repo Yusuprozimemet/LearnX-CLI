@@ -101,7 +101,7 @@ def compose_title_card(spec: VisualSpec, output_path: Path) -> Path:
     lx_x0 = cx - lx_size // 2
     lx_y0 = cy - 220
     draw.rounded_rectangle(
-        [lx_x0, lx_y0, lx_x0 + lx_size, lx_y0 + lx_size], radius=20, fill=ACCENT_CYAN
+        (lx_x0, lx_y0, lx_x0 + lx_size, lx_y0 + lx_size), radius=20, fill=ACCENT_CYAN
     )
     font_lx = _load_font(60, bold=True)
     draw.text((lx_x0 + 22, lx_y0 + 22), "LX", font=font_lx, fill=BG_DEEP)
@@ -168,10 +168,10 @@ def compose_hook_slide(spec: VisualSpec, output_path: Path, total: int) -> Path:
     panel_y0 = BODY_Y + 10
     panel_x1 = CONTENT_RIGHT - 80
     draw.rounded_rectangle(
-        [CONTENT_LEFT - 16, panel_y0 - 20, panel_x1, panel_y0 + 280], radius=12, fill=BG_PANEL
+        (CONTENT_LEFT - 16, panel_y0 - 20, panel_x1, panel_y0 + 280), radius=12, fill=BG_PANEL
     )
     draw.rectangle(
-        [CONTENT_LEFT - 16, panel_y0 - 20, CONTENT_LEFT - 6, panel_y0 + 280], fill=ACCENT_AMBER
+        (CONTENT_LEFT - 16, panel_y0 - 20, CONTENT_LEFT - 6, panel_y0 + 280), fill=ACCENT_AMBER
     )
 
     # Open-quote decoration (two vertical bars — reliable in all system fonts)
@@ -233,7 +233,7 @@ def compose_concept_slide(
     if spec.code_snippet:
         draw_code_block(img, draw, spec.code_snippet, after_bullets + 20)
 
-    if has_diagram:
+    if has_diagram and diagram_png is not None:
         paste_diagram(img, diagram_png)
 
     draw_footer_bar(draw, spec.memory_hook)
@@ -270,12 +270,12 @@ def compose_memory_slide(spec: VisualSpec, output_path: Path, total: int) -> Pat
     hook_card_h = 200
     cx = CANVAS_W // 2
     draw.rounded_rectangle(
-        [CONTENT_LEFT - 16, hook_card_y, CONTENT_RIGHT + 16, hook_card_y + hook_card_h],
+        (CONTENT_LEFT - 16, hook_card_y, CONTENT_RIGHT + 16, hook_card_y + hook_card_h),
         radius=12,
         fill=BG_PANEL,
     )
     draw.rectangle(
-        [CONTENT_LEFT - 16, hook_card_y, CONTENT_LEFT - 4, hook_card_y + hook_card_h],
+        (CONTENT_LEFT - 16, hook_card_y, CONTENT_LEFT - 4, hook_card_y + hook_card_h),
         fill=ACCENT_AMBER,
     )
 
@@ -301,8 +301,8 @@ def compose_memory_slide(spec: VisualSpec, output_path: Path, total: int) -> Pat
             sum_y += 44
 
     # Footer
-    draw.rectangle([0, FOOTER_BAR_Y, CANVAS_W, CANVAS_H], fill=BG_CARD)
-    draw.rectangle([0, FOOTER_BAR_Y, 10 + 2, CANVAS_H], fill=ACCENT_AMBER)
+    draw.rectangle((0, FOOTER_BAR_Y, CANVAS_W, CANVAS_H), fill=BG_CARD)
+    draw.rectangle((0, FOOTER_BAR_Y, 10 + 2, CANVAS_H), fill=ACCENT_AMBER)
     font_pin = _load_font(22, bold=True)
     font_anal = _load_font(26)
     text_y = FOOTER_BAR_Y + 26

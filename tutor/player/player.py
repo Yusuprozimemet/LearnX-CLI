@@ -1,8 +1,12 @@
 import logging
 import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from tutor.infra.llm import LLMFn
 
 import pygame
 
@@ -23,7 +27,7 @@ class TutorPlayer:
     units: list[TeachingUnit]
     chunks: list[Chunk] = field(default_factory=list)
     session: SessionLog | None = None
-    llm_fn: object = None
+    llm_fn: "LLMFn | None" = None
     no_qa: bool = False
     qa_count: int = 0
     _state: PlayerState = field(default="PAUSED", init=False)
@@ -31,7 +35,7 @@ class TutorPlayer:
     _start_time: float = field(default=0.0, init=False)
     _pause_start: float = field(default=0.0, init=False)
     _current_unit_duration_s: int = field(default=0, init=False)
-    _duration_cache: dict = field(default_factory=dict, init=False)
+    _duration_cache: dict[str, int] = field(default_factory=dict, init=False)
 
     def run(self) -> None:
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
@@ -106,7 +110,7 @@ class TutorPlayer:
         key = input_handler.get_key()
         if key is None:
             return
-        dispatch: dict[str, object] = {
+        dispatch: dict[str, Callable[[], None]] = {
             " ": self._toggle_play_pause,
             "p": self._toggle_play_pause,
             "n": self._next_unit,
@@ -184,6 +188,7 @@ class TutorPlayer:
             self._state = "PAUSED"
             return
 
+        assert self.session is not None
         answer_text = qa.answer(
             question=question,
             current_unit=current_unit,
@@ -279,6 +284,7 @@ class TutorPlayer:
         from tutor.qa import qa
 
         current_unit = self.units[self._current_idx]
+        assert self.session is not None
         answer_text = qa.answer(
             question=question,
             current_unit=current_unit,

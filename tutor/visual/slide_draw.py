@@ -46,7 +46,7 @@ def draw_background(img: Image.Image, colour: str = BG_DEEP) -> None:
 
 
 def draw_accent_strip(draw: ImageDraw.ImageDraw, colour: str = ACCENT_CYAN) -> None:
-    draw.rectangle([0, 0, ACCENT_STRIP_W - 1, CANVAS_H], fill=colour)
+    draw.rectangle((0, 0, ACCENT_STRIP_W - 1, CANVAS_H), fill=colour)
 
 
 def draw_subtle_grid(draw: ImageDraw.ImageDraw) -> None:
@@ -63,9 +63,9 @@ def draw_top_bar(draw: ImageDraw.ImageDraw, unit_idx: int, total: int) -> None:
 
 
 def draw_footer_bar(draw: ImageDraw.ImageDraw, memory_hook: str) -> None:
-    draw.rectangle([0, FOOTER_BAR_Y, CANVAS_W, CANVAS_H], fill=BG_CARD)
+    draw.rectangle((0, FOOTER_BAR_Y, CANVAS_W, CANVAS_H), fill=BG_CARD)
     # Green left accent bar
-    draw.rectangle([0, FOOTER_BAR_Y, ACCENT_STRIP_W + 2, CANVAS_H], fill=ACCENT_GREEN)
+    draw.rectangle((0, FOOTER_BAR_Y, ACCENT_STRIP_W + 2, CANVAS_H), fill=ACCENT_GREEN)
 
     font_icon = _load_font(22, bold=True)
     font_hook = _load_font(36, bold=True)
@@ -117,12 +117,12 @@ def draw_bullets(
     panel_y2 = y + est_h
 
     draw.rounded_rectangle(
-        [panel_x1, panel_y1, panel_x2, panel_y2],
+        (panel_x1, panel_y1, panel_x2, panel_y2),
         radius=10,
         fill=BG_PANEL,
     )
     # Left cyan accent bar on panel
-    draw.rectangle([panel_x1, panel_y1, panel_x1 + 4, panel_y2], fill=ACCENT_CYAN)
+    draw.rectangle((panel_x1, panel_y1, panel_x1 + 4, panel_y2), fill=ACCENT_CYAN)
 
     cur_y = y
     for point in shown:
@@ -152,8 +152,8 @@ def draw_code_block(
     x0, y0 = CONTENT_LEFT, y_start
     x1, y1 = CONTENT_LEFT + 880, y0 + block_h
 
-    draw.rounded_rectangle([x0, y0, x1, y1], radius=8, fill=BG_CARD, outline=DIVIDER, width=1)
-    draw.rectangle([x0, y0, x0 + 4, y1], fill=ACCENT_CYAN)
+    draw.rounded_rectangle((x0, y0, x1, y1), radius=8, fill=BG_CARD, outline=DIVIDER, width=1)
+    draw.rectangle((x0, y0, x0 + 4, y1), fill=ACCENT_CYAN)
 
     font_hdr = _load_font(20, mono=True)
     font_code = _load_font(28, mono=True)
@@ -192,7 +192,7 @@ def paste_diagram(img: Image.Image, diagram_path: Path) -> None:
     panel_x1 = DIAGRAM_X + DIAGRAM_W + pad
     panel_y1 = DIAGRAM_Y + DIAGRAM_H + pad
     img_draw = ImageDraw.Draw(img)
-    img_draw.rounded_rectangle([panel_x0, panel_y0, panel_x1, panel_y1], radius=12, fill=BG_PANEL)
+    img_draw.rounded_rectangle((panel_x0, panel_y0, panel_x1, panel_y1), radius=12, fill=BG_PANEL)
 
     offset_x = DIAGRAM_X + (DIAGRAM_W - new_w) // 2
     offset_y = DIAGRAM_Y + (DIAGRAM_H - new_h) // 2
@@ -203,7 +203,7 @@ def draw_logo(draw: ImageDraw.ImageDraw) -> None:
     """Draw 'LX' pill at top-right corner."""
     x0, y0 = CANVAS_W - 90, 14
     x1, y1 = CANVAS_W - 14, 56
-    draw.rounded_rectangle([x0, y0, x1, y1], radius=8, fill=ACCENT_CYAN)
+    draw.rounded_rectangle((x0, y0, x1, y1), radius=8, fill=ACCENT_CYAN)
     font = _load_font(24, bold=True)
     draw.text((x0 + 10, y0 + 6), "LX", font=font, fill=BG_DEEP)
 
@@ -214,5 +214,5 @@ def draw_tag(draw: ImageDraw.ImageDraw, text: str, x: int, y: int, colour: str) 
     bbox = draw.textbbox((0, 0), text, font=font)
     tw = bbox[2] - bbox[0]
     pad = 12
-    draw.rounded_rectangle([x, y, x + tw + pad * 2, y + 30], radius=6, fill=colour)
+    draw.rounded_rectangle((x, y, x + tw + pad * 2, y + 30), radius=6, fill=colour)
     draw.text((x + pad, y + 5), text, font=font, fill=BG_DEEP)

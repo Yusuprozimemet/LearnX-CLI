@@ -60,5 +60,5 @@ warn_unused_ignores = true
 exclude = ["tutor/tests/"]
 
 [[tool.mypy.overrides]]
-module = ["pygame.*", "pydub.*", "edge_tts.*"]
+module = ["pygame.*", "pydub.*", "edge_tts.*", "readchar.*"]
 ignore_missing_imports = true

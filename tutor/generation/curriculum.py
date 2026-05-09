@@ -8,7 +8,7 @@ from tutor.constants import (
     WPM,
 )
 from tutor.exceptions import LLMError
-from tutor.infra.llm import load_prompt, parse_json_response
+from tutor.infra.llm import LLMFn, load_prompt, parse_json_response
 from tutor.models import Chunk, DocProfile, TeachingUnit
 
 log = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ def plan(
     chunks: list[Chunk],
     profile: DocProfile,
     duration_min: int,
-    llm_fn,
+    llm_fn: LLMFn,
     difficulty: str = "beginner",
     topic: str | None = None,
 ) -> list[TeachingUnit]:
