@@ -69,8 +69,8 @@ After `pre-commit install`, ruff runs automatically on every commit.
 
 | Hook | Reason excluded |
 |---|---|
-| mypy | Too slow — 10–20 s per run; belongs in CI only |
-| pytest | Way too slow for a commit hook |
+| mypy | Too slow — 10–20 s per run; run manually before PRs, not on every commit |
+| pytest | Far too slow for a commit hook; run locally before pushing |
 | `check-json` / `check-yaml` | No significant JSON/YAML authoring in this repo |
 | `detect-secrets` | No secrets committed; `.env` is in `.gitignore` |
 

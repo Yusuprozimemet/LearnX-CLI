@@ -2,22 +2,26 @@
 
 ## Goal
 
-Add a GitHub Actions CI workflow that runs on every push and pull request.
-Every check that currently requires a human to run manually should run automatically.
-After this day, the "115 tests" claim in the README has a badge behind it.
+Add a GitHub Actions CI workflow that runs a fast lint check on every push and
+pull request. The total CI run time is under 15 seconds.
+
+Code review automation is handled by CodeRabbit, which is already configured on
+the repository. CI's only responsibility here is catching lint and formatting
+errors that should never reach a reviewer in the first place.
+
+Tests and type checking are run locally before pushing — they are not CI jobs
+in v0.
 
 ---
 
-## What CI must enforce
+## What CI enforces
 
-| Check | Tool | Why |
+| Check | Tool | Run time |
 |---|---|---|
-| Code style | `ruff check` + `ruff format --check` | Catch lint errors and unformatted code before review |
-| Test suite | `pytest` | Catch regressions on every push |
-| No check runs twice | Parallel jobs | Fast feedback — total wall time ≤ 3 min |
+| Lint errors | `ruff check tutor/` | ~5 s |
+| Formatting | `ruff format --check tutor/` | ~3 s |
 
-Type checking (mypy) is added to CI in Day 2 after the type errors are fixed.
-Adding it before the errors are fixed would make every existing push fail.
+Nothing else. One job, two commands.
 
 ---
 
@@ -51,96 +55,68 @@ jobs:
 
       - name: Check formatting
         run: ruff format --check tutor/
-
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-
-      - name: Install dependencies
-        run: pip install -e ".[dev]"
-
-      - name: Run tests
-        run: pytest --tb=short
-        env:
-          SDL_VIDEODRIVER: dummy
-          SDL_AUDIODRIVER: dummy
 ```
 
 ### Design decisions
 
-**`branches: ["**"]` for push** — CI runs on every branch, not just `main`. A
-broken feature branch is caught before a PR is opened.
+**`branches: ["**"]` for push** — lint runs on every branch. A formatting error
+on a feature branch is caught before a PR is opened, not after.
 
-**`branches: ["main", "v*-*"]` for pull_request** — PRs targeting `main` or any
-version branch (e.g. `v2-visual-pipeline`) trigger CI. PRs to other branches do not.
+**`branches: ["main", "v*-*"]` for pull_request** — PR checks trigger on PRs to
+`main` or any version branch (e.g. `v3-conversation-slides`). PRs between
+short-lived branches do not trigger CI.
 
-**`SDL_VIDEODRIVER: dummy` + `SDL_AUDIODRIVER: dummy`** — pygame requires a display
-and audio device to initialise. Without these env vars, importing pygame on a
-headless CI runner raises `pygame.error: No available video device`. Setting both
-to `dummy` gives pygame a fake device so imports succeed and player state-machine
-tests run without a real display.
+**No dependency install** — ruff is installed directly (`pip install ruff`), not
+through `pip install -e .[dev]`. This keeps the lint job fast: no audio, video, or
+Pillow dependencies needed to check code style.
 
-**`cache: pip`** — caches pip's download cache keyed by the Python version and
-`pyproject.toml` hash. Saves 30–60 s on repeated runs.
-
-**Two separate jobs (lint, test)** — they run in parallel. A lint failure does not
-block the test job. Both statuses appear independently in the PR checks panel.
+**One job, not two** — there is no parallel test job. Lint is fast enough that
+running both `ruff check` and `ruff format --check` sequentially in a single job
+is simpler than splitting them.
 
 ---
 
 ## README badge
 
-Add to `README.md` immediately below the `# LearnX CLI` heading:
+Add immediately below the `# LearnX CLI` heading:
 
 ```markdown
 ![CI](https://github.com/Yusuprozimemet/LearnX-CLI/actions/workflows/ci.yml/badge.svg)
 ```
 
-Place it on its own line, before the description paragraph. This badge reflects
-the `main` branch status by default.
+The badge reflects the `main` branch status. It turns red when a push introduces
+a lint or formatting error.
 
 ---
 
-## Branch protection (recommended, not enforced by this spec)
+## Branch protection (recommended)
 
-After CI is green on `main`, enable branch protection in GitHub settings:
+After CI is green on `main`, enable in GitHub → Settings → Branches:
 
-- Require status checks: `Lint`, `Test`
-- Require branches to be up to date before merging
-- Do not require administrator bypass
+- Required status check: `Lint`
+- Require branch to be up to date before merging
 
-This converts CI from informational to blocking.
+This makes CI blocking rather than informational. One required check, not three.
 
 ---
 
 ## Acceptance criteria
 
-- [ ] `.github/workflows/ci.yml` exists with `lint` and `test` jobs
-- [ ] Lint job runs `ruff check` and `ruff format --check` — both pass on current code
-- [ ] Test job runs `pytest --tb=short` — passes 115+ tests
-- [ ] Both jobs triggered on push to any branch
-- [ ] Both jobs triggered on PR to `main` or `v*-*` branches
-- [ ] `SDL_VIDEODRIVER=dummy` and `SDL_AUDIODRIVER=dummy` set in test job
-- [ ] `pip` cache enabled in test job
+- [ ] `.github/workflows/ci.yml` exists with a single `lint` job
+- [ ] Lint job installs only ruff — no other dependencies
+- [ ] `ruff check tutor/` passes on current codebase
+- [ ] `ruff format --check tutor/` passes on current codebase (after day0 format baseline)
+- [ ] Workflow triggers on push to any branch
+- [ ] Workflow triggers on PR to `main` or `v*-*`
+- [ ] No test job, no typecheck job
 - [ ] CI badge added to `README.md`
-- [ ] First workflow run on push shows both jobs green
+- [ ] First push after adding the workflow shows the lint job green
 
 ## Local verification before pushing
 
 ```bash
-# Simulate the lint job locally
 ruff check tutor/
 ruff format --check tutor/
-
-# Simulate the test job locally
-pytest --tb=short
 
 # Verify the workflow file is valid YAML
 python -c "import yaml; yaml.safe_load(open('.github/workflows/ci.yml'))"

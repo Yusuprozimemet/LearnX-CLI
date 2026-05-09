@@ -10,6 +10,10 @@ v1 (audio), v2 (video), and v3 (conversation-driven slides) are feature mileston
 v0 is the baseline they all sit on. Some of it is already in place. This document
 audits what exists, names the real gaps, and closes them in priority order.
 
+The guiding principle: **fix what is missing, don't add what isn't needed.**
+Every item below has a specific problem it solves in this codebase. Nothing is
+included because it "looks professional" in the abstract.
+
 ---
 
 ## What is already solid
@@ -35,21 +39,21 @@ These are not problems. v0 does not refactor them.
 
 ### 1 — No CI
 
-**The single most important gap.**
+There is no GitHub Actions workflow. Linting errors accumulate silently and are
+only caught when someone remembers to run ruff manually.
 
-115 tests exist but run only manually. There is no GitHub Actions workflow. This means:
-- A PR can merge with broken tests and nobody knows
-- The "115 tests" claim in the README has no automation behind it
-- Linting and type errors accumulate silently
+CI at this stage has one job: fast lint. Running the full test suite or type
+checker in CI adds minutes to every push for no practical gain — tests are run
+locally before pushing, and CodeRabbit handles automated code review on PRs.
 
 **What is missing:**
 ```
 .github/
   workflows/
-    ci.yml      ← ruff check + mypy + pytest on every push and PR
+    ci.yml      ← ruff check + ruff format --check on every push
 ```
 
-**Fix:** One workflow file. Three steps. No external services.
+**Fix:** One workflow, one lint job, under 15 seconds. No external services.
 
 ---
 
@@ -62,127 +66,102 @@ pythonpath = ["."]
 testpaths = ["tutor/tests"]
 ```
 
-There is no:
-- Package name, version, or description
-- Dependency list (`pydub`, `edge-tts`, `pillow`, `groq`, etc.)
-- Build system (`[build-system]`)
-- Tool configurations for ruff and mypy
+There is no package name, version, dependency list, build system, or tool
+configuration. `pip install -e .` does not work. A contributor cannot set up
+the project cleanly without reading source files to discover dependencies.
 
-`pip install learnx-cli` does not work. `pip install -e .` does not work. A contributor
-cannot install the project cleanly from the repository.
-
-**Fix:** Complete `pyproject.toml` with Hatchling as the build backend, all runtime
-dependencies pinned to minimum versions, and dev dependencies in an optional group.
+**Fix:** Complete `pyproject.toml` — build system, runtime deps, dev deps group,
+entry point (`learnx`), ruff and mypy configuration.
 
 ---
 
 ### 3 — No linting or formatting configuration
 
-`ruff` is not configured and not enforced. There is no `[tool.ruff]` section in
-`pyproject.toml`. Style inconsistencies are fixed manually, inconsistently, or not at all.
+`ruff` is not configured and not enforced anywhere. There is no `[tool.ruff]`
+section in `pyproject.toml`. Style inconsistencies accumulate silently.
 
-**Fix:** Add `[tool.ruff]` and `[tool.ruff.lint]` to `pyproject.toml`. Run `ruff format`
-across the codebase once to establish a clean baseline. After that, CI enforces it.
+**Fix:** Add `[tool.ruff]` and `[tool.ruff.lint]` to `pyproject.toml`. Run
+`ruff format` once to establish a clean baseline. CI enforces it on every push.
 
 ---
 
 ### 4 — Type hints exist but mypy is not configured
 
-The code uses type annotations throughout, but:
-- There is no `mypy.ini` or `[tool.mypy]` configuration
-- mypy is not in the CI pipeline
-- Some annotations are incorrect or incomplete (particularly in the visual pipeline added in v2)
+The code uses type annotations throughout but there is no mypy configuration.
+Some annotations are incorrect or incomplete (notably `VisualSpec.diagram_spec: object`
+and `ShellContext.player: object`). These provide documentation value but no enforcement.
 
-This means the type hints provide documentation value but no enforcement. Type errors
-accumulate until something breaks at runtime.
+mypy is a **local developer tool** in v0 — it is not added to CI. Running the full
+type checker on every push is time-consuming and the fix burden (strict mode on an
+existing codebase) is not worth the gain at this stage. Configure it, fix the most
+egregious errors, run it manually before PRs.
 
-**Fix:** Add `[tool.mypy]` to `pyproject.toml` with strict settings. Fix all existing
-mypy errors. After that, CI blocks any new type errors.
+**Fix:** Add `[tool.mypy]` to `pyproject.toml`. Fix the known incorrect annotations.
+Document that `mypy tutor/` should pass before opening a PR.
 
 ---
 
 ### 5 — No pre-commit hooks
 
-There is no `.pre-commit-config.yaml`. Contributors can commit code that fails ruff
-or mypy, which then fails in CI. The feedback loop is: commit → push → CI fail → fix →
-push again. Pre-commit hooks move the feedback loop to before the commit.
+There is no `.pre-commit-config.yaml`. The feedback loop for lint errors is:
+commit → push → CI fail → fix → push again. Pre-commit hooks shorten this to:
+commit → auto-fix → done.
 
-**Fix:** `.pre-commit-config.yaml` with two hooks: `ruff format` and `ruff check --fix`.
-mypy is intentionally kept in CI only (too slow for pre-commit).
+**Fix:** `.pre-commit-config.yaml` with ruff format and ruff check. mypy is
+intentionally excluded — too slow for a commit hook.
 
 ---
 
 ### 6 — Session listing shows too little
 
-`/sessions` prints session names and unit counts. It does not show:
-- Total audio duration
-- Whether a video (`full_session.mp4`) exists
-- When the session was generated
+`/sessions` shows names and file sizes. It does not show duration, video status,
+or date. `tutorial.meta.json` is already written at generate time but only holds
+`source_file`. This is a one-line change at write time and a small rewrite of the
+display.
 
-This is not a feature gap — `tutorial.meta.json` already exists and is written at
-generate time. It just does not capture duration or timestamp.
-
-**Fix:** Write `generated_at` (ISO 8601) and `total_duration_s` to `tutorial.meta.json`
-at the end of `/generate`. Update `/sessions` to read and display them.
+**Fix:** Add `generated_at` and `total_duration_s` to `tutorial.meta.json` at the
+end of `/generate`. Rewrite `/sessions` to show duration, `[video]` badge, and date.
 
 ---
 
 ## What v0 explicitly does NOT include
 
-These are real engineering practices. They are not right for this project at this scale.
-
 | Recommendation | Why not |
 |---|---|
-| FastAPI / web API | The CLI is the product. A web layer triples the codebase for zero benefit until there is a user who requires a web interface. |
-| Redis / Celery | The full pipeline runs in ~45 s on one machine. Distributed workers solve a concurrency problem that does not exist yet. |
-| PostgreSQL / Alembic | File-based sessions are self-contained and portable. A database migration breaks the clean `audio/<session>/` mental model and introduces a new operational dependency. |
-| Prometheus / OpenTelemetry | Observability infrastructure for whom? This is a single-user CLI. File logging is sufficient and already in place. |
-| Plugin system for TTS providers | No current demand for multiple providers. `edge-tts` works. Build the abstraction when a second provider is needed, not before. |
-| Docker | Useful for a server deployment. LearnX installs in 5 minutes on a laptop. Containerising a local CLI adds complexity with no benefit until there is a server to run. |
-| Pydantic-settings | The current `.env` + TOML config works. Adding a third config layer costs more than it saves at this scale. |
-| Dependency injection framework | The codebase already passes `llm_fn: Callable` as a function argument — that is dependency injection. A DI container is not needed. |
+| pytest in CI | Tests run in ~6 s locally. Running them in CI adds pipeline time with no practical benefit for a single-developer project. Run before pushing. |
+| mypy in CI | Type-checking an existing codebase under strict mode requires a dedicated cleanup sprint. It is not a lightweight CI gate. Run locally before PRs. |
+| FastAPI / web API | The CLI is the product. A web layer triples the codebase for zero benefit until there is a user who requires it. |
+| Redis / Celery | The full pipeline runs in ~45 s on one machine. Distributed workers solve a problem that does not exist yet. |
+| PostgreSQL / Alembic | File-based sessions are self-contained and portable. A database adds an operational dependency and breaks the `audio/<session>/` mental model. |
+| Prometheus / OpenTelemetry | Observability infrastructure for a single-user CLI. File logging is sufficient and already in place. |
+| Plugin system for TTS | No demand for multiple providers. Build the abstraction when a second provider is needed, not before. |
+| Docker | Useful for a server. LearnX installs in 5 minutes on a laptop. Containerising a local CLI adds complexity with no benefit until there is a server to run. |
 
-The pattern: every item above solves a scaling or deployment problem. LearnX does not
-have scaling or deployment problems. It has engineering quality gaps that are far simpler
-to fix.
+The pattern: each item solves a problem this project does not have yet.
 
 ---
 
 ## Implementation
 
-### Week 1 — CI and linting (highest return, lowest risk)
+### Week 1 — Packaging and CI (highest return, lowest risk)
 
-1. Complete `pyproject.toml`:
-   - `[project]` with name, version, description, Python ≥ 3.11
-   - All runtime dependencies with minimum versions
-   - `[project.optional-dependencies]` dev group: ruff, mypy, pytest, pytest-asyncio
-   - `[project.scripts]` entry point: `learnx = tutor.__main__:main`
-   - `[tool.ruff]` and `[tool.ruff.lint]` configuration
-2. Run `ruff format .` — establish clean baseline, commit as a single formatting commit
-3. Add `.github/workflows/ci.yml`:
-   - Trigger: push and pull_request to main and v*-* branches
-   - Jobs: `ruff check` → `pytest` (two jobs, run in parallel)
+1. Complete `pyproject.toml` — build system, deps, entry point, ruff config
+2. Run `ruff format tutor/` — clean baseline, single standalone commit
+3. Add `.github/workflows/ci.yml` — one lint job, under 15 s
 4. Add CI badge to README
 
-### Week 2 — Type safety
+### Week 2 — Type safety (local)
 
-5. Add `[tool.mypy]` to `pyproject.toml` — strict, exclude `tutor/tests/`
-6. Run `mypy tutor/` — collect all errors
-7. Fix errors module by module: `models.py` first, then `infra/`, then `generation/`,
-   then `visual/`; `tests/` is excluded from strict checking
-8. CI now runs mypy as a third job
+5. Add `[tool.mypy]` to `pyproject.toml`
+6. Fix known incorrect annotations (`diagram_spec`, `ShellContext.player`, `LLMFn`)
+7. Run `mypy tutor/` and fix remaining errors module by module
+8. Document: "run `mypy tutor/` before opening a PR"
 
 ### Week 3 — Pre-commit and session UX
 
-9. Add `.pre-commit-config.yaml` with ruff format + ruff check
-10. Document setup in README: `pre-commit install`
-11. Add `generated_at` + `total_duration_s` to `tutorial.meta.json` at generate time
-12. Rewrite `/sessions` output:
-    ```
-    LearnX > /sessions
-      week2_3     4 units  26:14  [video]  2026-05-09
-      week3_1     3 units  18:42           2026-05-07
-    ```
+9. Add `.pre-commit-config.yaml` — ruff format + ruff check
+10. Add `generated_at` + `total_duration_s` to `tutorial.meta.json`
+11. Rewrite `/sessions` to show duration, video badge, and date
 
 ---
 
@@ -192,11 +171,9 @@ After v0, the codebase will have:
 
 | Concern | Before | After |
 |---|---|---|
-| Tests run automatically | Never | Every push and PR |
-| Type errors caught | At runtime | In CI before merge |
-| Style enforced | Manually | Pre-commit + CI |
+| Lint enforced | Never | Every push (CI) + every commit (pre-commit) |
+| Type errors caught | At runtime | Before PRs (mypy locally) |
 | Clean install | Does not work | `pip install -e .[dev]` |
-| Session metadata | Name + unit count | + duration + video status + date |
+| Session metadata | Name + file size | + duration + video badge + date |
 
-These changes do not add features. They make the existing 115 tests and type hints
-do the job they were written for. v3 implementation should be built on this baseline.
+v3 implementation begins on this baseline.
