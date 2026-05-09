@@ -38,6 +38,7 @@ async def _render_all(lines: list[DialogueLine], tmp_dir: str) -> list[RenderedS
     results: list[RenderedSegment | None] = [None] * len(lines)
 
     with tqdm(total=len(lines), desc="Generating audio", unit="seg") as pbar:
+
         async def render_one(idx: int, line: DialogueLine) -> None:
             async with semaphore:
                 results[idx] = await render_segment(line, tmp_dir, idx)

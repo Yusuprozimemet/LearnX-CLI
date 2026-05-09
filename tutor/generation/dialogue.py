@@ -6,7 +6,7 @@ from pathlib import Path
 
 from tutor.constants import PROMPT_VERSION, SUMMARY_CACHE_DIR
 from tutor.exceptions import LLMError
-from tutor.infra.llm import LIMITS, load_prompt, parse_json_response
+from tutor.infra.llm import LIMITS, LLMFn, load_prompt
 from tutor.models import Chunk, DialogueLine, TeachingUnit
 
 log = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ def generate(
     unit: TeachingUnit,
     source_chunks: list[Chunk],
     fmt: str,
-    llm_fn,
+    llm_fn: LLMFn,
     difficulty: str = "beginner",
     cache_dir: str = SUMMARY_CACHE_DIR,
 ) -> list[DialogueLine]:
@@ -36,26 +36,32 @@ def generate(
     source_text = "\n\n".join(f"## {c.heading}\n{c.text}" for c in relevant)
     source_text = _truncate_source(source_text, LIMITS["max_source_tokens"])
 
-    unit_json = json.dumps({
-        "concept": unit.concept,
-        "complexity": unit.complexity,
-        "word_budget": unit.word_budget,
-        "key_facts": unit.key_facts,
-        "common_misconception": unit.common_misconception,
-        "good_analogy": unit.good_analogy,
-        "question_style": unit.question_style,
-        "memory_hook": unit.memory_hook,
-    }, indent=2)
+    unit_json = json.dumps(
+        {
+            "concept": unit.concept,
+            "complexity": unit.complexity,
+            "word_budget": unit.word_budget,
+            "key_facts": unit.key_facts,
+            "common_misconception": unit.common_misconception,
+            "good_analogy": unit.good_analogy,
+            "question_style": unit.question_style,
+            "memory_hook": unit.memory_hook,
+        },
+        indent=2,
+    )
 
     speaker_constraint = (
         "IMPORTANT: Only use ALEX and SAM speakers. Do NOT use MAYA."
         if fmt == "dual-tutor"
         else "IMPORTANT: Only use ALEX and MAYA speakers. Do NOT use SAM."
     )
-    system_prompt = load_prompt("dialogue.txt").format(
-        format=fmt,
-        word_budget=unit.word_budget,
-    ) + f"\n\n{speaker_constraint}"
+    system_prompt = (
+        load_prompt("dialogue.txt").format(
+            format=fmt,
+            word_budget=unit.word_budget,
+        )
+        + f"\n\n{speaker_constraint}"
+    )
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -80,7 +86,12 @@ def generate(
 
     Path(cache_dir).mkdir(parents=True, exist_ok=True)
     cache_file.write_text(
-        json.dumps([{"speaker": l.speaker, "text": l.text, "unit_number": l.unit_number} for l in lines]),
+        json.dumps(
+            [
+                {"speaker": ln.speaker, "text": ln.text, "unit_number": ln.unit_number}
+                for ln in lines
+            ]
+        ),
         encoding="utf-8",
     )
 
@@ -92,7 +103,9 @@ def _truncate_source(text: str, max_tokens: int) -> str:
     max_words = int(max_tokens / 1.3)
     if len(words) <= max_words:
         return text
-    log.warning("Source text truncated from %d to %d words for context limit", len(words), max_words)
+    log.warning(
+        "Source text truncated from %d to %d words for context limit", len(words), max_words
+    )
     return " ".join(words[:max_words])
 
 
@@ -112,19 +125,19 @@ def _normalize_speakers(lines: list[DialogueLine], fmt: str) -> list[DialogueLin
     if fmt == "dual-tutor":
         return [
             DialogueLine(
-                speaker="SAM" if l.speaker == "MAYA" else l.speaker,
-                text=l.text,
-                unit_number=l.unit_number,
+                speaker="SAM" if ln.speaker == "MAYA" else ln.speaker,
+                text=ln.text,
+                unit_number=ln.unit_number,
             )
-            for l in lines
+            for ln in lines
         ]
     return [
         DialogueLine(
-            speaker="MAYA" if l.speaker == "SAM" else l.speaker,
-            text=l.text,
-            unit_number=l.unit_number,
+            speaker="MAYA" if ln.speaker == "SAM" else ln.speaker,
+            text=ln.text,
+            unit_number=ln.unit_number,
         )
-        for l in lines
+        for ln in lines
     ]
 
 

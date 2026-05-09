@@ -5,6 +5,7 @@ import sys
 import tempfile
 from pathlib import Path
 from subprocess import DEVNULL
+from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -14,26 +15,27 @@ from tutor.models import VisualSpec
 log = logging.getLogger(__name__)
 
 # ── Output dimensions ──────────────────────────────────────────────────────
-DIAGRAM_W    = 800
-DIAGRAM_H    = 500
-CODE_COMP_H  = 400
-ANALOGY_H    = 260
+DIAGRAM_W = 800
+DIAGRAM_H = 500
+CODE_COMP_H = 400
+ANALOGY_H = 260
 
 # ── Dark palette ───────────────────────────────────────────────────────────
-BG_CARD     = "#161b22"
-BG_WRONG    = "#2a0d0d"
-BG_RIGHT    = "#0d2a1a"
-TEXT_PRI    = "#e6edf3"
-TEXT_SEC    = "#8b949e"
-COL_WRONG   = "#f85149"
-COL_RIGHT   = "#3fb950"
+BG_CARD = "#161b22"
+BG_WRONG = "#2a0d0d"
+BG_RIGHT = "#0d2a1a"
+TEXT_PRI = "#e6edf3"
+TEXT_SEC = "#8b949e"
+COL_WRONG = "#f85149"
+COL_RIGHT = "#3fb950"
 COL_DIVIDER = "#30363d"
-COL_CYAN    = "#00b4d8"
+COL_CYAN = "#00b4d8"
 
-_graphviz_ready: bool | None = None   # None = unchecked
+_graphviz_ready: bool | None = None  # None = unchecked
 
 
 # ── Public API ─────────────────────────────────────────────────────────────
+
 
 def render_diagram(spec: VisualSpec, output_dir: Path) -> Path | None:
     """
@@ -45,7 +47,9 @@ def render_diagram(spec: VisualSpec, output_dir: Path) -> Path | None:
     if spec.diagram_type == "code_comparison":
         if isinstance(spec.diagram_spec, dict):
             return _render_code_comparison(spec.diagram_spec, output_path)
-        log.warning("unit %d code_comparison spec is not a dict — using analogy fallback", spec.unit_index)
+        log.warning(
+            "unit %d code_comparison spec is not a dict — using analogy fallback", spec.unit_index
+        )
         return _render_analogy_fallback(spec.analogy or spec.memory_hook, output_path)
 
     if spec.diagram_type in ("class_diagram", "flowchart", "concept_map"):
@@ -53,11 +57,13 @@ def render_diagram(spec: VisualSpec, output_dir: Path) -> Path | None:
         try:
             return _render_graphviz(str(spec.diagram_spec or ""), output_path, engine)
         except ConfigError:
-            raise                   # missing graphviz is fatal — propagate to caller
+            raise  # missing graphviz is fatal — propagate to caller
         except Exception as exc:
             log.warning(
                 "graphviz failed for unit %d (%s): %s — using analogy fallback",
-                spec.unit_index, spec.diagram_type, exc,
+                spec.unit_index,
+                spec.diagram_type,
+                exc,
             )
             return _render_analogy_fallback(spec.analogy or spec.memory_hook, output_path)
 
@@ -67,13 +73,12 @@ def render_diagram(spec: VisualSpec, output_dir: Path) -> Path | None:
 
 # ── Graphviz renderer ──────────────────────────────────────────────────────
 
+
 def _render_graphviz(dot_source: str, output_path: Path, engine: str = "dot") -> Path:
     _check_graphviz()
     themed = _apply_dark_theme(dot_source)
 
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".dot", delete=False, encoding="utf-8"
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".dot", delete=False, encoding="utf-8") as f:
         f.write(themed)
         dot_path = Path(f.name)
 
@@ -127,7 +132,7 @@ def _check_graphviz() -> None:
         search_roots = [
             Path("C:/Program Files/Graphviz"),
             Path("C:/Graphviz"),
-            Path("C:/graphviz"),          # portable zip extracted here
+            Path("C:/graphviz"),  # portable zip extracted here
         ]
         for root in search_roots:
             if not root.exists():
@@ -147,12 +152,13 @@ def _check_graphviz() -> None:
 
 # ── Pillow renderers ───────────────────────────────────────────────────────
 
-def _render_code_comparison(spec_dict: dict, output_path: Path) -> Path:
-    img  = Image.new("RGB", (DIAGRAM_W, CODE_COMP_H), BG_CARD)
+
+def _render_code_comparison(spec_dict: dict[str, Any], output_path: Path) -> Path:
+    img = Image.new("RGB", (DIAGRAM_W, CODE_COMP_H), BG_CARD)
     draw = ImageDraw.Draw(img)
 
-    font_hdr   = _load_font(18, bold=True)
-    font_code  = _load_font(15, mono=True)
+    font_hdr = _load_font(18, bold=True)
+    font_code = _load_font(15, mono=True)
     font_label = _load_font(13, mono=True)
 
     col_w = DIAGRAM_W // 2
@@ -160,14 +166,14 @@ def _render_code_comparison(spec_dict: dict, output_path: Path) -> Path:
     draw.line([(col_w, 0), (col_w, CODE_COMP_H)], fill=COL_DIVIDER, width=1)
 
     # Left column — wrong
-    draw.rectangle([0, 0, col_w - 1, 32], fill=BG_WRONG)
+    draw.rectangle((0, 0, col_w - 1, 32), fill=BG_WRONG)
     draw.text((12, 7), "WRONG", font=font_hdr, fill=COL_WRONG)
     _draw_code_block(draw, spec_dict.get("wrong", ""), font_code, x=12, y=44)
     if lbl := spec_dict.get("label_wrong", ""):
         draw.text((12, CODE_COMP_H - 26), lbl, font=font_label, fill=TEXT_SEC)
 
     # Right column — correct
-    draw.rectangle([col_w, 0, DIAGRAM_W - 1, 32], fill=BG_RIGHT)
+    draw.rectangle((col_w, 0, DIAGRAM_W - 1, 32), fill=BG_RIGHT)
     draw.text((col_w + 12, 7), "CORRECT", font=font_hdr, fill=COL_RIGHT)
     _draw_code_block(draw, spec_dict.get("right", ""), font_code, x=col_w + 12, y=44)
     if lbl := spec_dict.get("label_right", ""):
@@ -178,18 +184,18 @@ def _render_code_comparison(spec_dict: dict, output_path: Path) -> Path:
 
 
 def _render_analogy_fallback(analogy: str, output_path: Path) -> Path:
-    img  = Image.new("RGB", (DIAGRAM_W, ANALOGY_H), BG_CARD)
+    img = Image.new("RGB", (DIAGRAM_W, ANALOGY_H), BG_CARD)
     draw = ImageDraw.Draw(img)
 
-    draw.rectangle([0, 0, 7, ANALOGY_H], fill=COL_CYAN)     # left accent stripe
+    draw.rectangle((0, 0, 7, ANALOGY_H), fill=COL_CYAN)  # left accent stripe
 
     font_quote = _load_font(72, bold=True)
-    font_body  = _load_font(26)
-    font_attr  = _load_font(17)
+    font_body = _load_font(26)
+    font_attr = _load_font(17)
 
     draw.text((20, 8), "“", font=font_quote, fill=COL_CYAN)
 
-    text  = analogy or "No analogy available."
+    text = analogy or "No analogy available."
     lines = _wrap(text, max_chars=56)
     y = 70
     for line in lines[:3]:
@@ -204,13 +210,22 @@ def _render_analogy_fallback(analogy: str, output_path: Path) -> Path:
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
-def _draw_code_block(draw: ImageDraw.ImageDraw, code: str, font, x: int, y: int) -> None:
+
+def _draw_code_block(
+    draw: ImageDraw.ImageDraw,
+    code: str,
+    font: ImageFont.ImageFont | ImageFont.FreeTypeFont,
+    x: int,
+    y: int,
+) -> None:
     for line in code.split("\n")[:8]:
         draw.text((x, y), line, font=font, fill=TEXT_PRI)
         y += 22
 
 
-def _load_font(size: int, bold: bool = False, mono: bool = False) -> ImageFont.ImageFont:
+def _load_font(
+    size: int, bold: bool = False, mono: bool = False
+) -> ImageFont.ImageFont | ImageFont.FreeTypeFont:
     if mono:
         names = ["Consolas", "Courier New", "DejaVu Sans Mono"]
     elif bold:
@@ -220,13 +235,15 @@ def _load_font(size: int, bold: bool = False, mono: bool = False) -> ImageFont.I
     for name in names:
         try:
             return ImageFont.truetype(name, size)
-        except (OSError, IOError):
+        except OSError:
             pass
     return ImageFont.load_default()
 
 
 def _wrap(text: str, max_chars: int = 56) -> list[str]:
-    words, lines, current = text.split(), [], []
+    words: list[str] = text.split()
+    lines: list[str] = []
+    current: list[str] = []
     for word in words:
         if len(" ".join(current + [word])) <= max_chars:
             current.append(word)

@@ -8,7 +8,7 @@ from tutor.constants import (
     WPM,
 )
 from tutor.exceptions import LLMError
-from tutor.infra.llm import load_prompt, parse_json_response
+from tutor.infra.llm import LLMFn, load_prompt, parse_json_response
 from tutor.models import Chunk, DocProfile, TeachingUnit
 
 log = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ def plan(
     chunks: list[Chunk],
     profile: DocProfile,
     duration_min: int,
-    llm_fn,
+    llm_fn: LLMFn,
     difficulty: str = "beginner",
     topic: str | None = None,
 ) -> list[TeachingUnit]:
@@ -50,7 +50,10 @@ def plan(
     except LLMError:
         retry_messages = messages + [
             {"role": "assistant", "content": raw},
-            {"role": "user", "content": "Your previous response could not be parsed as JSON. Reply with the raw JSON array only, no other text."},
+            {
+                "role": "user",
+                "content": "Your previous response could not be parsed as JSON. Reply with the raw JSON array only, no other text.",
+            },
         ]
         raw = llm_fn(retry_messages, call_type="curriculum")
         data = parse_json_response(raw)

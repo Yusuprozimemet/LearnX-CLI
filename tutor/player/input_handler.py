@@ -1,5 +1,5 @@
-import sys
 import logging
+import sys
 
 log = logging.getLogger(__name__)
 
@@ -13,6 +13,7 @@ def get_key() -> str | None:
 
 def _get_key_windows() -> str | None:
     import msvcrt
+
     if msvcrt.kbhit():
         raw = msvcrt.getch()
         try:
@@ -24,8 +25,9 @@ def _get_key_windows() -> str | None:
 
 def _get_key_unix() -> str | None:
     try:
-        import readchar
         import threading
+
+        import readchar
 
         result: list[str | None] = [None]
 
@@ -37,5 +39,7 @@ def _get_key_unix() -> str | None:
         t.join(timeout=0.05)
         return result[0]
     except ImportError:
-        log.warning("readchar not installed — keyboard input unavailable on non-Windows. pip install readchar")
+        log.warning(
+            "readchar not installed — keyboard input unavailable on non-Windows. pip install readchar"
+        )
         return None

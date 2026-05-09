@@ -1,5 +1,7 @@
 # LearnX CLI
 
+![CI](https://github.com/Yusuprozimemet/LearnX-CLI/actions/workflows/ci.yml/badge.svg)
+
 > **Spec-driven development project** — every feature was designed in a written specification before a single line of code was written. See [`specs/`](specs/) for the full day-by-day spec chain.
 
 Turn any Markdown document into an interactive audio tutorial and a fully-produced MP4 video — all from a branded terminal shell.
@@ -36,6 +38,15 @@ Turn any Markdown document into an interactive audio tutorial and a fully-produc
 ---
 
 ## How it was built — spec-driven development
+
+### v0 — Engineering foundations
+
+| Spec | Feature |
+|---|---|
+| [`specs/v0/day0.md`](specs/v0/day0.md) | Project packaging — `pyproject.toml`, entry point, ruff config |
+| [`specs/v0/day1.md`](specs/v0/day1.md) | CI/CD — GitHub Actions: lint, test, typecheck on every push |
+| [`specs/v0/day2.md`](specs/v0/day2.md) | Type safety — mypy strict, fix all errors, add to CI |
+| [`specs/v0/day3.md`](specs/v0/day3.md) | Pre-commit hooks + session metadata (`/sessions` with duration + date) |
 
 Each feature day had a written specification reviewed and approved before implementation began:
 
@@ -112,6 +123,15 @@ apt install ffmpeg             # Linux
 
 > LearnX auto-detects common Windows install paths (including versioned folders like
 > `C:\ffmpeg\ffmpeg-8.x\bin\`) so a terminal restart is not always required.
+
+### Development
+
+```bash
+pip install -e .[dev]
+pre-commit install
+```
+
+After `pre-commit install`, ruff runs automatically on every commit.
 
 ---
 

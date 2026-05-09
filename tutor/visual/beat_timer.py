@@ -2,12 +2,13 @@
 Map slide PNGs to playback durations based on dialogue beat points.
 No ffmpeg, no Pillow, no LLM here.
 """
+
 from pathlib import Path
 
 from tutor.models import DialogueLine, VisualSpec
 
-MIN_SLIDE_DURATION  = 3.0   # seconds
-MAX_HOOK_DURATION   = 30.0  # cap hook slide — ALEX can monologue for a long time before MAYA
+MIN_SLIDE_DURATION = 3.0  # seconds
+MAX_HOOK_DURATION = 30.0  # cap hook slide — ALEX can monologue for a long time before MAYA
 TITLE_CARD_DURATION = 4.0
 OUTRO_CARD_DURATION = 6.0
 
@@ -23,11 +24,10 @@ def compute_slide_timings(
     Return [(slide_path, duration_seconds), ...] ordered for the ffmpeg concat script.
     Title = 4 s fixed; outro = 6 s fixed; unit slides derived from dialogue beats.
     """
-    unit_count = len([v for v in visuals if v.slide_type == "unit"])
     result: list[tuple[Path, float]] = []
 
     slide_map = _build_slide_map(slides)
-    beat_map  = _build_beat_map(script_lines, line_start_offsets, visuals, unit_durations_s)
+    beat_map = _build_beat_map(script_lines, line_start_offsets, visuals, unit_durations_s)
 
     # Pre-compute actual cumulative audio end for each unit (no silence inflation)
     unit_audio_end: dict[int, float] = {}
@@ -44,23 +44,23 @@ def compute_slide_timings(
 
     # Per-unit slides
     for unit_idx in sorted(beat_map.keys()):
-        beats = beat_map[unit_idx]   # {"hook": t, "concept": t, "memory": t}
+        beats = beat_map[unit_idx]  # {"hook": t, "concept": t, "memory": t}
 
-        hook_t    = beats.get("hook", 0.0)
+        hook_t = beats.get("hook", 0.0)
         concept_t = beats.get("concept", hook_t + MIN_SLIDE_DURATION)
-        memory_t  = beats.get("memory", concept_t + MIN_SLIDE_DURATION)
+        memory_t = beats.get("memory", concept_t + MIN_SLIDE_DURATION)
 
         # Use actual MP3 boundary (not inflated line offsets) so slides match audio
         unit_end = unit_audio_end.get(unit_idx, total_audio_end)
 
-        raw_hook    = concept_t - hook_t
-        hook_dur    = _clamp(min(raw_hook, MAX_HOOK_DURATION))
+        raw_hook = concept_t - hook_t
+        hook_dur = _clamp(min(raw_hook, MAX_HOOK_DURATION))
         concept_dur = _clamp(memory_t - concept_t + max(0.0, raw_hook - MAX_HOOK_DURATION))
-        memory_dur  = _clamp(unit_end - memory_t)
+        memory_dur = _clamp(unit_end - memory_t)
 
-        hook_slide    = slide_map.get(f"{unit_idx:02d}_hook")
+        hook_slide = slide_map.get(f"{unit_idx:02d}_hook")
         concept_slide = slide_map.get(f"{unit_idx:02d}_concept")
-        memory_slide  = slide_map.get(f"{unit_idx:02d}_memory")
+        memory_slide = slide_map.get(f"{unit_idx:02d}_memory")
 
         if hook_slide:
             result.append((hook_slide, hook_dur))
@@ -79,6 +79,7 @@ def compute_slide_timings(
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
+
 def _clamp(duration: float) -> float:
     return max(duration, MIN_SLIDE_DURATION)
 
@@ -87,7 +88,7 @@ def _build_slide_map(slides: list[Path]) -> dict[str, Path]:
     """Map stem identifiers to slide paths."""
     m: dict[str, Path] = {}
     for s in slides:
-        stem = s.stem           # e.g. "00_title", "01_hook", "99_outro"
+        stem = s.stem  # e.g. "00_title", "01_hook", "99_outro"
         if "_title" in stem:
             m["title"] = s
         elif "_outro" in stem:
@@ -118,7 +119,7 @@ def _build_beat_map(
         unit_audio_starts[ui] = cursor
         cursor += dur
 
-    for i, (ln, offset) in enumerate(zip(script_lines, line_start_offsets)):
+    for _i, (ln, offset) in enumerate(zip(script_lines, line_start_offsets, strict=False)):
         u = ln.unit_number
         if u not in beats:
             continue

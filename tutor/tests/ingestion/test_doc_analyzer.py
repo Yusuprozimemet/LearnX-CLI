@@ -1,6 +1,7 @@
 import pytest
+
+from tutor.exceptions import IngestionError
 from tutor.ingestion.doc_analyzer import analyze
-from tutor.constants import STRATEGY_A_TOKEN_LIMIT, STRATEGY_B_TOKEN_LIMIT
 
 
 def test_small_doc_strategy_a(tmp_path):
@@ -46,5 +47,5 @@ def test_no_code_blocks(tmp_path):
 
 
 def test_nonexistent_file_raises():
-    with pytest.raises(Exception):
+    with pytest.raises(IngestionError):
         analyze("/nonexistent/path/file.md")

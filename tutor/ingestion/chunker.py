@@ -7,7 +7,6 @@ from tutor.constants import (
     STRATEGY_C_OVERLAP_TOKENS,
     STRATEGY_C_WINDOW_TOKENS,
 )
-from tutor.exceptions import IngestionError
 from tutor.ingestion import parse_content
 from tutor.models import Chunk, DocProfile
 
@@ -22,9 +21,6 @@ def chunk(text: str, profile: DocProfile) -> list[Chunk]:
     else:
         chunks = _strategy_c(text)
     return _apply_quality_rules(chunks)
-
-
-
 
 
 def _slugify(heading: str) -> str:
@@ -139,16 +135,18 @@ def _strategy_c(text: str) -> list[Chunk]:
         chunk_text = " ".join(window_words)
         token_count = int(len(window_words) * 1.3)
 
-        chunks.append(Chunk(
-            chunk_id=f"window_{idx:03d}",
-            breadcrumb=f"Window {idx + 1}",
-            heading=f"Window {idx + 1}",
-            level=0,
-            token_count=token_count,
-            text=chunk_text,
-            has_code=False,
-            overlapping=(idx > 0),
-        ))
+        chunks.append(
+            Chunk(
+                chunk_id=f"window_{idx:03d}",
+                breadcrumb=f"Window {idx + 1}",
+                heading=f"Window {idx + 1}",
+                level=0,
+                token_count=token_count,
+                text=chunk_text,
+                has_code=False,
+                overlapping=(idx > 0),
+            )
+        )
 
         idx += 1
         step = word_window - word_overlap

@@ -3,11 +3,10 @@ import json
 import logging
 from dataclasses import asdict
 from pathlib import Path
-from typing import Callable
 
 from tutor.constants import SUMMARY_CACHE_DIR
 from tutor.exceptions import LLMError
-from tutor.infra.llm import load_prompt, parse_json_response
+from tutor.infra.llm import LLMFn, load_prompt, parse_json_response
 from tutor.models import TeachingUnit, VisualSpec
 
 log = logging.getLogger(__name__)
@@ -22,7 +21,7 @@ def plan_visuals(
     units_json_path: Path,
     doc_title: str,
     session: str,
-    llm_fn: Callable,
+    llm_fn: LLMFn,
     difficulty: str,
     video_dir: Path,
     no_cache: bool = False,
@@ -58,7 +57,7 @@ def plan_visuals(
 
 def _plan_unit(
     unit: TeachingUnit,
-    llm_fn: Callable,
+    llm_fn: LLMFn,
     difficulty: str,
     cache_file: Path,
 ) -> VisualSpec:
@@ -92,7 +91,9 @@ def _plan_unit(
     except Exception as exc:
         log.warning(
             "Visual spec failed for unit %d (%s): %s — using fallback",
-            unit.unit, unit.concept, exc,
+            unit.unit,
+            unit.concept,
+            exc,
         )
         spec = _fallback_spec(unit)
 
@@ -117,7 +118,9 @@ def _parse_visual_response(raw: str, unit: TeachingUnit) -> VisualSpec:
 
     diagram_type = data.get("diagram_type", "none")
     if diagram_type not in VALID_DIAGRAM_TYPES:
-        log.warning("Unknown diagram_type %r for unit %d — falling back to 'none'", diagram_type, unit.unit)
+        log.warning(
+            "Unknown diagram_type %r for unit %d — falling back to 'none'", diagram_type, unit.unit
+        )
         diagram_type = "none"
 
     diagram_spec = data.get("diagram_spec")
@@ -131,20 +134,16 @@ def _parse_visual_response(raw: str, unit: TeachingUnit) -> VisualSpec:
         key_points=list(data.get("key_points", unit.key_facts[:5])),
         code_snippet=data.get("code_snippet") or None,
         diagram_type=diagram_type,
-        diagram_spec=diagram_spec,
+        diagram_spec=diagram_spec,  # type: ignore[arg-type]
         memory_hook=str(data.get("memory_hook", unit.memory_hook)),
         analogy=unit.good_analogy,
     )
 
 
-def _validate_diagram(
-    diagram_type: str, diagram_spec: object, unit_idx: int
-) -> tuple[str, object]:
+def _validate_diagram(diagram_type: str, diagram_spec: object, unit_idx: int) -> tuple[str, object]:
     if diagram_type in ("class_diagram", "flowchart", "concept_map"):
         if not isinstance(diagram_spec, str) or not _looks_like_dot(diagram_spec):
-            log.warning(
-                "diagram_spec for unit %d is not valid DOT — setting to 'none'", unit_idx
-            )
+            log.warning("diagram_spec for unit %d is not valid DOT — setting to 'none'", unit_idx)
             return "none", None
     elif diagram_type == "code_comparison":
         if not isinstance(diagram_spec, dict) or not all(

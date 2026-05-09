@@ -3,11 +3,18 @@ week1/
 week2/
 systemDesign/
 
+# Generated output directories
+audio/
+video/
+
 # Generated audio output
 *.mp3
 *.script.txt
 *.units.json
 *.session.json
+*.chunks.json
+*.meta.json
+*.visuals.json
 tutorial_units/
 
 # TTS temp files

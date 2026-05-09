@@ -1,13 +1,16 @@
-import sys
 import logging
-from tutor.models import TeachingUnit
+import sys
+
 from tutor.constants import PLAYER_BAR_WIDTH
+from tutor.models import TeachingUnit
 
 log = logging.getLogger(__name__)
 
 BORDER = "━" * 56
 COMMANDS_PLAYING = "  [space] pause   [?] ask   [n] next   [b] prev   [q] quit"
-COMMANDS_PAUSED  = "  [space] resume   [?] ask   [n] next   [b] prev   [r] replay   [s] summary   [q] quit"
+COMMANDS_PAUSED = (
+    "  [space] resume   [?] ask   [n] next   [b] prev   [r] replay   [s] summary   [q] quit"
+)
 
 _first_render = True
 
@@ -49,7 +52,7 @@ def clear_status() -> None:
 def print_summary(unit: TeachingUnit) -> None:
     print(f"\n{BORDER}")
     print(f"  Summary: {unit.concept}")
-    print(f"  Key facts:")
+    print("  Key facts:")
     for fact in unit.key_facts:
         print(f"    • {fact}")
     print(f"  Remember: {unit.memory_hook}")
@@ -82,7 +85,7 @@ def print_resume_hint() -> None:
 
 
 def print_question_header(topic: str, position_fmt: str) -> None:
-    print(f"\n── Ask a question ──────────────────────────────────")
+    print("\n── Ask a question ──────────────────────────────────")
     print(f"Topic: {topic}  |  Position: {position_fmt}")
     print()
 
@@ -95,7 +98,7 @@ def print_answer(answer: str, unit_concept: str) -> None:
     border = "─" * 56
     print(f"\n{border}")
     print(f"Answer:\n{answer}")
-    suffix = border[len(unit_concept) + 10:]
+    suffix = border[len(unit_concept) + 10 :]
     print(f"\n── Source: §{unit_concept} {suffix}")
     print()
 

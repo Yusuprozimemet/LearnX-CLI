@@ -1,5 +1,6 @@
 import re
 from pathlib import Path
+from typing import Literal
 
 from tutor.constants import STRATEGY_A_TOKEN_LIMIT, STRATEGY_B_TOKEN_LIMIT
 from tutor.exceptions import IngestionError
@@ -17,6 +18,7 @@ def analyze(filepath: str) -> DocProfile:
     word_count = len(text.split())
     estimated_tokens = int(word_count * 1.3)
 
+    strategy: Literal["A", "B", "C"]
     if estimated_tokens <= STRATEGY_A_TOKEN_LIMIT:
         strategy = "A"
     elif estimated_tokens <= STRATEGY_B_TOKEN_LIMIT:

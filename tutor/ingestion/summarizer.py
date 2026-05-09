@@ -3,8 +3,7 @@ import logging
 from pathlib import Path
 
 from tutor.constants import PROMPT_VERSION, SUMMARY_CACHE_DIR
-from tutor.infra.llm import LIMITS
-from tutor.infra.llm import load_prompt
+from tutor.infra.llm import LIMITS, LLMFn, load_prompt
 from tutor.models import Chunk
 
 log = logging.getLogger(__name__)
@@ -12,7 +11,7 @@ log = logging.getLogger(__name__)
 
 def summarize_all(
     chunks: list[Chunk],
-    llm_fn,
+    llm_fn: LLMFn,
     cache_dir: str = SUMMARY_CACHE_DIR,
 ) -> list[Chunk]:
     cache_path = Path(cache_dir)

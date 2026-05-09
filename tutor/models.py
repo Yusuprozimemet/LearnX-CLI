@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -81,13 +82,13 @@ class SessionLog:
 @dataclass
 class VisualSpec:
     unit_index: int
-    slide_type: str            # "title_card" | "unit" | "outro"
+    slide_type: str  # "title_card" | "unit" | "outro"
     concept: str = ""
     hook_question: str = ""
     key_points: list[str] = field(default_factory=list)
     code_snippet: str | None = None
     diagram_type: str = "none"
-    diagram_spec: object = None   # str (DOT) | dict | None
+    diagram_spec: str | dict[str, object] | None = None
     memory_hook: str = ""
     analogy: str = ""
     # title_card fields

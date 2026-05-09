@@ -2,12 +2,13 @@
 Shell command handlers for the video pipeline.
 Separate from commands.py so the audio pipeline file stays under 400 lines.
 """
+
 import logging
 from functools import partial
 from pathlib import Path
 
 from tutor.cli import theme
-from tutor.cli.commands import AUDIO_DIR, ShellContext, _session_name
+from tutor.cli.commands import AUDIO_DIR, ShellContext
 
 log = logging.getLogger(__name__)
 
@@ -55,8 +56,7 @@ def cmd_vsessions(tokens: list[str], ctx: ShellContext) -> None:
         return
 
     sessions = sorted(
-        d for d in VIDEO_DIR.iterdir()
-        if d.is_dir() and (d / "full_session.mp4").exists()
+        d for d in VIDEO_DIR.iterdir() if d.is_dir() and (d / "full_session.mp4").exists()
     )
     if not sessions:
         print(theme.dim("  No completed videos yet. Use /video <session-name>."))
@@ -73,13 +73,13 @@ def cmd_vsessions(tokens: list[str], ctx: ShellContext) -> None:
 
 def _run_video_pipeline(session: str, ctx: ShellContext) -> None:
     """Resolve paths and run the full visual pipeline."""
-    from tutor.visual import run_visual_pipeline
     from tutor.config import load_config
     from tutor.infra import llm as _llm
+    from tutor.visual import run_visual_pipeline
 
-    config    = load_config()
-    provider  = "groq"
-    llm_fn    = partial(_llm.chat, provider=provider, config=config)
+    config = load_config()
+    provider = "groq"
+    llm_fn = partial(_llm.chat, provider=provider, config=config)
     video_dir = VIDEO_DIR / session
     video_dir.mkdir(parents=True, exist_ok=True)
 
@@ -88,9 +88,7 @@ def _run_video_pipeline(session: str, ctx: ShellContext) -> None:
     print(f"\n  Resolving session {theme.bold(session)}...")
     print(f"  Found {len(units)} units. Starting visual pipeline.")
 
-    result = run_visual_pipeline(
-        session, audio_dir, video_dir, llm_fn, difficulty="beginner"
-    )
+    result = run_visual_pipeline(session, audio_dir, video_dir, llm_fn, difficulty="beginner")
     ctx.last_video = result
     ctx.current_session = session
 

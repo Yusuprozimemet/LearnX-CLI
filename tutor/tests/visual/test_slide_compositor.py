@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import pytest
 from PIL import Image
 
 from tutor.models import VisualSpec
@@ -34,21 +33,25 @@ def _unit(idx: int, **kwargs) -> VisualSpec:
 
 def _title() -> VisualSpec:
     return VisualSpec(
-        unit_index=0, slide_type="title_card",
-        title="Java Interfaces", subtitle="3 units · beginner",
+        unit_index=0,
+        slide_type="title_card",
+        title="Java Interfaces",
+        subtitle="3 units · beginner",
         doc_source="week2_3",
     )
 
 
 def _outro(n: int) -> VisualSpec:
     return VisualSpec(
-        unit_index=n + 1, slide_type="outro",
+        unit_index=n + 1,
+        slide_type="outro",
         memory_hooks=["Contract first", "Default has body"],
         session_stats=f"{n} units",
     )
 
 
 # ── title card ──────────────────────────────────────────────────────────────
+
 
 def test_title_card_is_1920x1080(tmp_path):
     spec = _title()
@@ -60,6 +63,7 @@ def test_title_card_is_1920x1080(tmp_path):
 
 # ── hook slide ───────────────────────────────────────────────────────────────
 
+
 def test_hook_slide_is_1920x1080(tmp_path):
     result = compose_hook_slide(_unit(1), tmp_path / "hook.png", total=3)
     img = Image.open(result)
@@ -67,6 +71,7 @@ def test_hook_slide_is_1920x1080(tmp_path):
 
 
 # ── concept slide ────────────────────────────────────────────────────────────
+
 
 def test_concept_slide_with_diagram(tmp_path):
     diag = tmp_path / "diag.png"
@@ -102,6 +107,7 @@ def test_code_block_rendered_when_snippet_present(tmp_path):
 
 # ── memory slide ─────────────────────────────────────────────────────────────
 
+
 def test_memory_slide_is_1920x1080(tmp_path):
     result = compose_memory_slide(_unit(1), tmp_path / "memory.png", total=3)
     img = Image.open(result)
@@ -119,6 +125,7 @@ def test_memory_slide_uses_amber_strip(tmp_path):
 
 # ── outro card ───────────────────────────────────────────────────────────────
 
+
 def test_outro_card_is_1920x1080(tmp_path):
     result = compose_outro_card(_outro(3), tmp_path / "outro.png", "week2_3")
     img = Image.open(result)
@@ -126,6 +133,7 @@ def test_outro_card_is_1920x1080(tmp_path):
 
 
 # ── compose_all ──────────────────────────────────────────────────────────────
+
 
 def test_compose_all_returns_correct_count(tmp_path):
     n = 3
@@ -140,11 +148,14 @@ def test_compose_all_returns_correct_count(tmp_path):
 
 def test_font_fallback_on_missing_bundled_font(tmp_path, monkeypatch):
     from tutor.visual import slide_theme
+
     # Point bundled font paths to a non-existent directory so fallback triggers.
     monkeypatch.setattr(slide_theme, "_SANS_REGULAR", Path("/nonexistent/Inter-Regular.ttf"))
-    monkeypatch.setattr(slide_theme, "_SANS_BOLD",    Path("/nonexistent/Inter-Bold.ttf"))
-    monkeypatch.setattr(slide_theme, "_MONO_REGULAR", Path("/nonexistent/JetBrainsMono-Regular.ttf"))
-    monkeypatch.setattr(slide_theme, "_MONO_BOLD",    Path("/nonexistent/JetBrainsMono-Bold.ttf"))
+    monkeypatch.setattr(slide_theme, "_SANS_BOLD", Path("/nonexistent/Inter-Bold.ttf"))
+    monkeypatch.setattr(
+        slide_theme, "_MONO_REGULAR", Path("/nonexistent/JetBrainsMono-Regular.ttf")
+    )
+    monkeypatch.setattr(slide_theme, "_MONO_BOLD", Path("/nonexistent/JetBrainsMono-Bold.ttf"))
 
     result = compose_title_card(_title(), tmp_path / "title.png")
     assert result.exists()

@@ -1,7 +1,9 @@
 import json
+
 import pytest
+
 from tutor.generation.curriculum import plan
-from tutor.models import DocProfile, Chunk
+from tutor.models import Chunk, DocProfile
 
 
 def _make_profile() -> DocProfile:
@@ -32,30 +34,32 @@ def _make_chunks() -> list[Chunk]:
     ]
 
 
-GOOD_RESPONSE = json.dumps([
-    {
-        "concept": "Pass-by-Value",
-        "source_sections": ["s01"],
-        "complexity": 3,
-        "key_facts": ["Java passes references by value"],
-        "common_misconception": "Thinks Java passes objects by reference",
-        "good_analogy": "Copying an address, not a house",
-        "question_style": "predict",
-        "memory_hook": "Copy the address, not the house",
-        "prerequisite_concepts": [],
-    },
-    {
-        "concept": "String Equality",
-        "source_sections": ["s02"],
-        "complexity": 2,
-        "key_facts": ["Use .equals() not =="],
-        "common_misconception": "Thinks == compares content",
-        "good_analogy": "Two identical keys from different locksmiths",
-        "question_style": "error-spot",
-        "memory_hook": "Reference check, not content check",
-        "prerequisite_concepts": [],
-    },
-])
+GOOD_RESPONSE = json.dumps(
+    [
+        {
+            "concept": "Pass-by-Value",
+            "source_sections": ["s01"],
+            "complexity": 3,
+            "key_facts": ["Java passes references by value"],
+            "common_misconception": "Thinks Java passes objects by reference",
+            "good_analogy": "Copying an address, not a house",
+            "question_style": "predict",
+            "memory_hook": "Copy the address, not the house",
+            "prerequisite_concepts": [],
+        },
+        {
+            "concept": "String Equality",
+            "source_sections": ["s02"],
+            "complexity": 2,
+            "key_facts": ["Use .equals() not =="],
+            "common_misconception": "Thinks == compares content",
+            "good_analogy": "Two identical keys from different locksmiths",
+            "question_style": "error-spot",
+            "memory_hook": "Reference check, not content check",
+            "prerequisite_concepts": [],
+        },
+    ]
+)
 
 
 def fake_llm(messages, call_type="dialogue"):
@@ -64,6 +68,7 @@ def fake_llm(messages, call_type="dialogue"):
 
 def test_plan_returns_teaching_units():
     from tutor.models import TeachingUnit
+
     units = plan(_make_chunks(), _make_profile(), 20, fake_llm)
     assert len(units) == 2
     assert all(isinstance(u, TeachingUnit) for u in units)
@@ -77,16 +82,20 @@ def test_plan_computes_word_budgets():
 
 def test_plan_raises_on_empty_response():
     from tutor.exceptions import LLMError
+
     def empty_llm(messages, call_type="dialogue"):
         return "[]"
+
     with pytest.raises(LLMError):
         plan(_make_chunks(), _make_profile(), 20, empty_llm)
 
 
 def test_plan_raises_on_bad_json():
     from tutor.exceptions import LLMError
+
     def bad_llm(messages, call_type="dialogue"):
         return "not json at all"
+
     with pytest.raises(LLMError):
         plan(_make_chunks(), _make_profile(), 20, bad_llm)
 

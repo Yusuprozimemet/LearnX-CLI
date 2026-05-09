@@ -1,9 +1,11 @@
 import json
 import logging
 import re
-import sys
 import time
+import tomllib
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any, TypeAlias
 
 from openai import OpenAI
 
@@ -12,22 +14,16 @@ from tutor.exceptions import ConfigError, LLMError
 
 log = logging.getLogger(__name__)
 
+LLMFn: TypeAlias = Callable[..., str]
+
 # ---------------------------------------------------------------------------
 # Config loading — reads tutor/llm_config.toml at import time
 # ---------------------------------------------------------------------------
 
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    try:
-        import tomli as tomllib          # pip install tomli for Python < 3.11
-    except ImportError as _err:
-        raise ImportError("Python < 3.11 requires 'tomli': pip install tomli") from _err
-
 _CONFIG_PATH = Path(__file__).parent.parent / "llm_config.toml"
 
 
-def _load() -> dict:
+def _load() -> dict[str, Any]:
     with open(_CONFIG_PATH, "rb") as fh:
         return tomllib.load(fh)
 
@@ -53,6 +49,7 @@ _retry_delay_s: float = _cfg["llm"]["retry_delay_s"]
 # ---------------------------------------------------------------------------
 # Client factory
 # ---------------------------------------------------------------------------
+
 
 def _build_client(provider: str, config: Config) -> OpenAI:
     if provider == "groq":
@@ -80,8 +77,9 @@ def _build_client(provider: str, config: Config) -> OpenAI:
 # Chat
 # ---------------------------------------------------------------------------
 
+
 def chat(
-    messages: list[dict],
+    messages: list[dict[str, str]],
     config: Config,
     provider: str = "groq",
     call_type: str = "dialogue",
@@ -99,11 +97,12 @@ def chat(
         try:
             response = client.chat.completions.create(
                 model=model,
-                messages=messages,
+                messages=messages,  # type: ignore[arg-type]
                 temperature=_temperature,
                 max_tokens=max_tokens,
             )
             content = response.choices[0].message.content
+            assert content is not None, "LLM returned empty content"
             log.debug("LLM response (first 200 chars): %s", content[:200])
             return content
         except Exception as e:
@@ -127,6 +126,7 @@ def chat(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def parse_json_response(raw: str) -> object:
     text = re.sub(r"```(?:json)?\s*", "", raw).strip().rstrip("`").strip()

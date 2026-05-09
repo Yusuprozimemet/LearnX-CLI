@@ -1,22 +1,21 @@
 import json
-import pytest
-from pathlib import Path
 from dataclasses import asdict
-from tutor.models import TeachingUnit, VisualSpec
-from tutor.generation.visual_planner import (
-    plan_visuals,
-    _plan_unit,
-    _parse_visual_response,
-    _fallback_spec,
-    _build_title_card,
-    _build_outro,
-    _cache_path,
-)
 
+from tutor.generation.visual_planner import (
+    _build_outro,
+    _build_title_card,
+    _cache_path,
+    _fallback_spec,
+    _parse_visual_response,
+    _plan_unit,
+    plan_visuals,
+)
+from tutor.models import TeachingUnit, VisualSpec
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 def _make_unit(idx: int = 1, concept: str = "Pass-by-Value") -> TeachingUnit:
     return TeachingUnit(
@@ -38,32 +37,36 @@ def _make_units(n: int = 2) -> list[TeachingUnit]:
     return [_make_unit(i + 1, concepts[i % len(concepts)]) for i in range(n)]
 
 
-GOOD_LLM_RESPONSE = json.dumps({
-    "hook_question": "What really happens when Java passes an object?",
-    "key_points": [
-        "Java always passes copies",
-        "Primitive copies hold the value directly",
-        "Reference copies hold the memory address",
-    ],
-    "code_snippet": "void mutate(int x) { x = 99; }",
-    "diagram_type": "flowchart",
-    "diagram_spec": "digraph G { rankdir=TB\n A -> B }",
-    "memory_hook": "Copy the address, not the house",
-})
+GOOD_LLM_RESPONSE = json.dumps(
+    {
+        "hook_question": "What really happens when Java passes an object?",
+        "key_points": [
+            "Java always passes copies",
+            "Primitive copies hold the value directly",
+            "Reference copies hold the memory address",
+        ],
+        "code_snippet": "void mutate(int x) { x = 99; }",
+        "diagram_type": "flowchart",
+        "diagram_spec": "digraph G { rankdir=TB\n A -> B }",
+        "memory_hook": "Copy the address, not the house",
+    }
+)
 
-CODE_COMPARISON_RESPONSE = json.dumps({
-    "hook_question": "Which equality check should you use?",
-    "key_points": ["Use .equals() for content", "== checks identity"],
-    "code_snippet": None,
-    "diagram_type": "code_comparison",
-    "diagram_spec": {
-        "wrong": "if (a == b) {}",
-        "right": "if (a.equals(b)) {}",
-        "label_wrong": "compares references",
-        "label_right": "compares content",
-    },
-    "memory_hook": "equals for content, == for identity",
-})
+CODE_COMPARISON_RESPONSE = json.dumps(
+    {
+        "hook_question": "Which equality check should you use?",
+        "key_points": ["Use .equals() for content", "== checks identity"],
+        "code_snippet": None,
+        "diagram_type": "code_comparison",
+        "diagram_spec": {
+            "wrong": "if (a == b) {}",
+            "right": "if (a.equals(b)) {}",
+            "label_wrong": "compares references",
+            "label_right": "compares content",
+        },
+        "memory_hook": "equals for content, == for identity",
+    }
+)
 
 
 def fake_llm(messages, call_type="dialogue"):
@@ -73,6 +76,7 @@ def fake_llm(messages, call_type="dialogue"):
 # ---------------------------------------------------------------------------
 # _parse_visual_response
 # ---------------------------------------------------------------------------
+
 
 def test_parse_good_response_returns_visual_spec():
     unit = _make_unit()
@@ -103,28 +107,32 @@ def test_invalid_json_returns_fallback():
 
 def test_invalid_diagram_type_becomes_none():
     unit = _make_unit()
-    bad = json.dumps({
-        "hook_question": "Q?",
-        "key_points": ["fact"],
-        "code_snippet": None,
-        "diagram_type": "pie_chart",
-        "diagram_spec": None,
-        "memory_hook": "remember this",
-    })
+    bad = json.dumps(
+        {
+            "hook_question": "Q?",
+            "key_points": ["fact"],
+            "code_snippet": None,
+            "diagram_type": "pie_chart",
+            "diagram_spec": None,
+            "memory_hook": "remember this",
+        }
+    )
     spec = _parse_visual_response(bad, unit)
     assert spec.diagram_type == "none"
 
 
 def test_dot_diagram_without_valid_dot_string_becomes_none():
     unit = _make_unit()
-    bad = json.dumps({
-        "hook_question": "Q?",
-        "key_points": ["fact"],
-        "code_snippet": None,
-        "diagram_type": "class_diagram",
-        "diagram_spec": "this is not dot syntax",
-        "memory_hook": "remember",
-    })
+    bad = json.dumps(
+        {
+            "hook_question": "Q?",
+            "key_points": ["fact"],
+            "code_snippet": None,
+            "diagram_type": "class_diagram",
+            "diagram_spec": "this is not dot syntax",
+            "memory_hook": "remember",
+        }
+    )
     spec = _parse_visual_response(bad, unit)
     assert spec.diagram_type == "none"
     assert spec.diagram_spec is None
@@ -132,14 +140,16 @@ def test_dot_diagram_without_valid_dot_string_becomes_none():
 
 def test_code_comparison_missing_keys_becomes_none():
     unit = _make_unit()
-    bad = json.dumps({
-        "hook_question": "Q?",
-        "key_points": ["fact"],
-        "code_snippet": None,
-        "diagram_type": "code_comparison",
-        "diagram_spec": {"only_wrong": "x = 1"},
-        "memory_hook": "remember",
-    })
+    bad = json.dumps(
+        {
+            "hook_question": "Q?",
+            "key_points": ["fact"],
+            "code_snippet": None,
+            "diagram_type": "code_comparison",
+            "diagram_spec": {"only_wrong": "x = 1"},
+            "memory_hook": "remember",
+        }
+    )
     spec = _parse_visual_response(bad, unit)
     assert spec.diagram_type == "none"
 
@@ -147,6 +157,7 @@ def test_code_comparison_missing_keys_becomes_none():
 # ---------------------------------------------------------------------------
 # _fallback_spec
 # ---------------------------------------------------------------------------
+
 
 def test_fallback_spec_fields():
     unit = _make_unit()
@@ -161,6 +172,7 @@ def test_fallback_spec_fields():
 # ---------------------------------------------------------------------------
 # _build_title_card / _build_outro
 # ---------------------------------------------------------------------------
+
 
 def test_title_card_slide_type():
     units = _make_units(3)
@@ -184,6 +196,7 @@ def test_outro_collects_memory_hooks():
 # _plan_unit — caching
 # ---------------------------------------------------------------------------
 
+
 def test_cache_hit_skips_llm(tmp_path):
     unit = _make_unit()
     cache_file = tmp_path / "test.visual.json"
@@ -191,6 +204,7 @@ def test_cache_hit_skips_llm(tmp_path):
     cache_file.write_text(json.dumps(asdict(spec)), encoding="utf-8")
 
     call_count = {"n": 0}
+
     def counting_llm(messages, call_type="dialogue"):
         call_count["n"] += 1
         return GOOD_LLM_RESPONSE
@@ -205,6 +219,7 @@ def test_cache_miss_calls_llm(tmp_path):
     cache_file = tmp_path / "missing.visual.json"
 
     call_count = {"n": 0}
+
     def counting_llm(messages, call_type="dialogue"):
         call_count["n"] += 1
         return GOOD_LLM_RESPONSE
@@ -229,6 +244,7 @@ def test_llm_failure_produces_fallback_not_crash(tmp_path):
 # ---------------------------------------------------------------------------
 # plan_visuals — integration
 # ---------------------------------------------------------------------------
+
 
 def test_plan_visuals_returns_title_and_outro(tmp_path):
     units = _make_units(2)
@@ -272,6 +288,7 @@ def test_plan_visuals_no_cache_clears_cache(tmp_path):
     video_dir = tmp_path / "video"
 
     call_count = {"n": 0}
+
     def counting_llm(messages, call_type="dialogue"):
         call_count["n"] += 1
         return GOOD_LLM_RESPONSE
@@ -292,5 +309,11 @@ def test_unit_specs_have_required_fields(tmp_path):
     for spec in unit_specs:
         assert spec.concept
         assert isinstance(spec.key_points, list)
-        assert spec.diagram_type in {"class_diagram", "flowchart", "code_comparison", "concept_map", "none"}
+        assert spec.diagram_type in {
+            "class_diagram",
+            "flowchart",
+            "code_comparison",
+            "concept_map",
+            "none",
+        }
         assert spec.memory_hook is not None

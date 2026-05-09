@@ -1,16 +1,18 @@
 import logging
 import os
 import time
-from pathlib import Path
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from tutor.infra.llm import LLMFn
 
 import pygame
 
-from tutor.models import TeachingUnit, Chunk, SessionLog
-from tutor.player import player_display, input_handler
-from tutor.exceptions import PlayerError
 from tutor.constants import PLAYER_POLL_HZ
+from tutor.models import Chunk, SessionLog, TeachingUnit
+from tutor.player import input_handler, player_display
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +27,7 @@ class TutorPlayer:
     units: list[TeachingUnit]
     chunks: list[Chunk] = field(default_factory=list)
     session: SessionLog | None = None
-    llm_fn: object = None
+    llm_fn: "LLMFn | None" = None
     no_qa: bool = False
     qa_count: int = 0
     _state: PlayerState = field(default="PAUSED", init=False)
@@ -33,7 +35,7 @@ class TutorPlayer:
     _start_time: float = field(default=0.0, init=False)
     _pause_start: float = field(default=0.0, init=False)
     _current_unit_duration_s: int = field(default=0, init=False)
-    _duration_cache: dict = field(default_factory=dict, init=False)
+    _duration_cache: dict[str, int] = field(default_factory=dict, init=False)
 
     def run(self) -> None:
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
@@ -84,6 +86,7 @@ class TutorPlayer:
         if path not in self._duration_cache:
             try:
                 from pydub import AudioSegment
+
                 audio = AudioSegment.from_mp3(path)
                 self._duration_cache[path] = len(audio) // 1000
             except Exception:
@@ -107,7 +110,7 @@ class TutorPlayer:
         key = input_handler.get_key()
         if key is None:
             return
-        dispatch: dict[str, object] = {
+        dispatch: dict[str, Callable[[], None]] = {
             " ": self._toggle_play_pause,
             "p": self._toggle_play_pause,
             "n": self._next_unit,
@@ -176,12 +179,16 @@ class TutorPlayer:
         player_display.print_thinking()
 
         from tutor.qa import qa
-        current_unit = self.units[self._current_idx] if self._current_idx < len(self.units) else None
+
+        current_unit = (
+            self.units[self._current_idx] if self._current_idx < len(self.units) else None
+        )
         if current_unit is None:
             player_display.print_no_context()
             self._state = "PAUSED"
             return
 
+        assert self.session is not None
         answer_text = qa.answer(
             question=question,
             current_unit=current_unit,
@@ -199,7 +206,9 @@ class TutorPlayer:
     def _prompt_for_question(self) -> str | None:
         unit = self.units[self._current_idx] if self._current_idx < len(self.units) else None
         topic = unit.concept if unit else "current topic"
-        player_display.print_question_header(topic, player_display._fmt_time(self._elapsed_seconds()))
+        player_display.print_question_header(
+            topic, player_display._fmt_time(self._elapsed_seconds())
+        )
         try:
             return input("Your question: ").strip() or None
         except (KeyboardInterrupt, EOFError):
@@ -258,19 +267,24 @@ class TutorPlayer:
         """Answer a question posed from the shell thread (question already collected)."""
         if self.no_qa or self.llm_fn is None:
             from tutor.cli import theme
+
             print(theme.yellow("  Q&A is disabled (no API key or --no-qa set)."))
             return
         if self._current_idx >= len(self.units):
             from tutor.cli import theme
+
             print(theme.red("  No unit loaded."))
             return
 
         self._state = "ANSWERING"
         from tutor.cli import theme
+
         print(theme.dim("  Thinking..."))
 
         from tutor.qa import qa
+
         current_unit = self.units[self._current_idx]
+        assert self.session is not None
         answer_text = qa.answer(
             question=question,
             current_unit=current_unit,
@@ -292,5 +306,3 @@ class TutorPlayer:
             total_s=sum(self._get_duration(f) for f in self.unit_files),
             qa_count=self.qa_count,
         )
-
-
