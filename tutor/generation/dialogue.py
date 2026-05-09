@@ -87,7 +87,10 @@ def generate(
     Path(cache_dir).mkdir(parents=True, exist_ok=True)
     cache_file.write_text(
         json.dumps(
-            [{"speaker": ln.speaker, "text": ln.text, "unit_number": ln.unit_number} for ln in lines]
+            [
+                {"speaker": ln.speaker, "text": ln.text, "unit_number": ln.unit_number}
+                for ln in lines
+            ]
         ),
         encoding="utf-8",
     )

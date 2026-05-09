@@ -1,7 +1,5 @@
 import json
 
-import pytest
-
 from tutor.cli.commands import _format_duration, _read_meta
 
 
@@ -19,7 +17,11 @@ def test_read_meta_returns_empty_on_invalid_json(tmp_path):
 
 def test_read_meta_returns_dict_on_valid_file(tmp_path):
     meta_file = tmp_path / "tutorial.meta.json"
-    data = {"source_file": "week2/3.md", "generated_at": "2026-05-09T14:32:11", "total_duration_s": 1574.3}
+    data = {
+        "source_file": "week2/3.md",
+        "generated_at": "2026-05-09T14:32:11",
+        "total_duration_s": 1574.3,
+    }
     meta_file.write_text(json.dumps(data), encoding="utf-8")
     result = _read_meta(meta_file)
     assert result["source_file"] == "week2/3.md"
@@ -46,7 +48,7 @@ def test_sessions_output_handles_missing_meta(tmp_path, capsys):
     from pathlib import Path
     from unittest.mock import patch
 
-    from tutor.cli.commands import AUDIO_DIR, cmd_sessions
+    from tutor.cli.commands import cmd_sessions
 
     session_dir = tmp_path / "test_session"
     (session_dir / "tutorial_units").mkdir(parents=True)

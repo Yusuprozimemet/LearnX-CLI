@@ -114,4 +114,3 @@ def test_minimum_slide_duration_enforced():
         if "_title" in path.stem or "_outro" in path.stem:
             continue
         assert dur >= MIN_SLIDE_DURATION
-

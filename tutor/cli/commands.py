@@ -191,8 +191,6 @@ def cmd_generate(tokens: list[str], ctx: ShellContext) -> None:
 
 def cmd_sessions(tokens: list[str], ctx: ShellContext) -> None:
     """Usage: /sessions — list all audio sessions"""
-    import json as _json
-
     from tutor.cli.video_commands import VIDEO_DIR
 
     if not AUDIO_DIR.exists():
@@ -224,7 +222,7 @@ def cmd_sessions(tokens: list[str], ctx: ShellContext) -> None:
             f"  {theme.dim(date_str)}"
         )
 
-    print(theme.dim(f"\n  Play: /play <name>   Video: /video <name>"))
+    print(theme.dim("\n  Play: /play <name>   Video: /video <name>"))
     print()
 
 
