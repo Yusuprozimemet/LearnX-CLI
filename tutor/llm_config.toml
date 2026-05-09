@@ -10,7 +10,7 @@
 
 [providers.groq]
 curriculum = "llama-3.3-70b-versatile"
-dialogue   = "llama-3.1-8b-instant"
+dialogue   = "llama-3.3-70b-versatile"
 summarize  = "llama-3.1-8b-instant"
 qa         = "llama-3.1-8b-instant"
 visual     = "llama-3.3-70b-versatile"    # 70b needed for reliable DOT output
@@ -38,9 +38,9 @@ visual     = 1200
 # max_source_tokens:          source text sent with each dialogue prompt
 # max_summarize_input_tokens: chunk text sent to the summariser
 #
-# Rule of thumb for Groq free tier (6 000-token cap):
-#   max_source_tokens + ~830 (prompt overhead) + max_tokens.dialogue < 6 000
-#   → max_source_tokens ≤ 3 670  (currently 1 500 for a comfortable margin)
+# dialogue uses llama-3.3-70b-versatile (128k context window on Groq).
+# 3000 source + ~1200 prompt overhead + 2000 response = ~6200 tokens — fine.
+# summarize/qa use llama-3.1-8b-instant; keep their inputs small.
 
 [limits]
 max_source_tokens          = 3000
