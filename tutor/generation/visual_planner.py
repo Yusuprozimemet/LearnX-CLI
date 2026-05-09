@@ -180,7 +180,7 @@ def _build_title_card(doc_title: str, units: list[TeachingUnit], doc_source: str
         unit_index=0,
         slide_type="title_card",
         title=doc_title,
-        subtitle=f"{n} unit{'s' if n != 1 else ''} · beginner",
+        subtitle=f"{n} unit{'s' if n != 1 else ''} - beginner",
         doc_source=doc_source,
     )
 
