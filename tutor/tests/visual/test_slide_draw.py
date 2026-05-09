@@ -1,7 +1,6 @@
 """Tests for tutor/visual/slide_draw.py — drawing primitives."""
 from pathlib import Path
 
-import pytest
 from PIL import Image, ImageDraw
 
 from tutor.visual.slide_draw import (
@@ -21,7 +20,6 @@ from tutor.visual.slide_theme import (
     ACCENT_CYAN,
     ACCENT_GREEN,
     ACCENT_STRIP_W,
-    BG_CARD,
     BG_DEEP,
     CANVAS_H,
     CANVAS_W,
@@ -286,8 +284,7 @@ def test_draw_logo_paints_top_right():
     draw_background(img)
     draw_logo(draw)
 
-    # Logo is a rounded rectangle near top-right; pixel at roughly (1900, 30)
-    px = img.getpixel((CANVAS_W - 50, 30))
+    # Logo is a rounded rectangle near top-right.
     # Should be ACCENT_CYAN or the 'LX' text (BG_DEEP) — not pure BG_DEEP background
     # The rectangle fill is ACCENT_CYAN
     expected_cyan = _hex_to_rgb(ACCENT_CYAN)

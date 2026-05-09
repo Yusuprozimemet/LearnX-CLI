@@ -1,7 +1,7 @@
 """Tests for tutor/visual/slide_theme.py — _load_font and wrap_text."""
+
 from pathlib import Path
 
-import pytest
 from PIL import Image, ImageDraw, ImageFont
 
 from tutor.visual.slide_theme import (
@@ -9,13 +9,11 @@ from tutor.visual.slide_theme import (
     ACCENT_CYAN,
     ACCENT_GREEN,
     ACCENT_RED,
-    ACCENT_STRIP_W,
     BG_CARD,
     BG_DEEP,
     BODY_Y,
     BULLET_AREA_W,
     BULLET_AREA_W_FULL,
-    BULLET_LEAD,
     CANVAS_H,
     CANVAS_W,
     CONTENT_LEFT,
@@ -26,17 +24,14 @@ from tutor.visual.slide_theme import (
     DIAGRAM_X,
     DIAGRAM_Y,
     DIVIDER,
-    DIVIDER_Y,
     FOOTER_BAR_H,
     FOOTER_BAR_Y,
     TEXT_CODE,
     TEXT_PRIMARY,
     TEXT_SECONDARY,
-    TITLE_Y,
     _load_font,
     wrap_text,
 )
-
 
 # ── Constants sanity checks ──────────────────────────────────────────────────
 
@@ -86,7 +81,7 @@ def test_bullet_area_widths():
 def test_load_font_returns_a_font():
     font = _load_font(24)
     assert font is not None
-    assert isinstance(font, ImageFont.ImageFont)
+    assert isinstance(font, (ImageFont.ImageFont, ImageFont.FreeTypeFont))
 
 
 def test_load_font_bold_returns_a_font():

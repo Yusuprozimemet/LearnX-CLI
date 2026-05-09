@@ -1,21 +1,15 @@
 """
 Tests for tutor/visual/__init__.py helpers:
-  _doc_title_from_units, _load_all_lines, _mp3_duration, _format_duration
+    _doc_title_from_units, _load_all_lines, _mp3_duration, _format_duration
 """
+
 import json
 import subprocess
-from pathlib import Path
 
 import pytest
 
 from tutor.models import DialogueLine
-from tutor.visual import (
-    _doc_title_from_units,
-    _format_duration,
-    _load_all_lines,
-    _mp3_duration,
-)
-
+from tutor.visual import _doc_title_from_units, _format_duration, _load_all_lines, _mp3_duration
 
 # ── _doc_title_from_units ────────────────────────────────────────────────────
 
@@ -69,7 +63,7 @@ def test_load_all_lines_from_units_json(tmp_path):
     lines = _load_all_lines(units_json)
 
     assert len(lines) == 2
-    assert all(isinstance(l, DialogueLine) for l in lines)
+    assert all(isinstance(line, DialogueLine) for line in lines)
     assert lines[0].speaker == "ALEX"
     assert lines[1].speaker == "MAYA"
 
@@ -140,7 +134,7 @@ def test_load_all_lines_script_txt_filters_non_speaker_lines(tmp_path):
     )
     lines = _load_all_lines(units_json)
     # NARRATOR is not a known speaker
-    speakers = {l.speaker for l in lines}
+    speakers = {line.speaker for line in lines}
     assert "NARRATOR" not in speakers
     assert "ALEX" in speakers
     assert "MAYA" in speakers
@@ -168,9 +162,10 @@ def test_load_all_lines_script_assigns_units_sequentially(tmp_path):
     )
     lines = _load_all_lines(units_json)
     assert len(lines) == 4
-    unit_numbers = {l.unit_number for l in lines}
+    unit_numbers = {line.unit_number for line in lines}
     # Should span at least 2 distinct unit numbers (1 and 2)
     assert len(unit_numbers) >= 1
+
 
 
 # ── _mp3_duration ─────────────────────────────────────────────────────────────

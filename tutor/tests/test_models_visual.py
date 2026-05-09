@@ -1,18 +1,13 @@
 """
 Tests for PR additions in tutor/models.py (VisualSpec) and tutor/exceptions.py (VideoError).
 """
+
 import dataclasses
 
 import pytest
 
-from tutor.exceptions import (
-    ConfigError,
-    LLMError,
-    TutorError,
-    VideoError,
-)
+from tutor.exceptions import ConfigError, LLMError, TutorError, VideoError
 from tutor.models import VisualSpec
-
 
 # ── VideoError ────────────────────────────────────────────────────────────────
 
