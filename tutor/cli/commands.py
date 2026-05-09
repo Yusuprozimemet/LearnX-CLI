@@ -7,7 +7,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeAlias
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 from tutor.cli import theme
 
@@ -158,9 +158,24 @@ def cmd_generate(tokens: list[str], ctx: ShellContext) -> None:
             ctx.current_session = session
             # Write source metadata so the visual pipeline can find the doc title
             if args.input:
+                import datetime
                 import json as _json
 
-                meta = {"source_file": str(args.input)}
+                duration_s = 0.0
+                full_mp3 = output.parent / "tutorial.mp3"
+                if full_mp3.exists():
+                    try:
+                        from pydub import AudioSegment
+
+                        duration_s = len(AudioSegment.from_mp3(full_mp3)) / 1000.0
+                    except Exception:
+                        pass
+
+                meta = {
+                    "source_file": str(args.input),
+                    "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
+                    "total_duration_s": duration_s,
+                }
                 (output.parent / "tutorial.meta.json").write_text(
                     _json.dumps(meta, ensure_ascii=False), encoding="utf-8"
                 )
@@ -175,7 +190,9 @@ def cmd_generate(tokens: list[str], ctx: ShellContext) -> None:
 
 
 def cmd_sessions(tokens: list[str], ctx: ShellContext) -> None:
-    """Usage: /sessions — list all generated audio sessions in the audio/ folder"""
+    """Usage: /sessions — list all audio sessions"""
+    import json as _json
+
     from tutor.cli.video_commands import VIDEO_DIR
 
     if not AUDIO_DIR.exists():
@@ -191,14 +208,47 @@ def cmd_sessions(tokens: list[str], ctx: ShellContext) -> None:
 
     print()
     for s in sessions:
-        units = list((s / "tutorial_units").glob("*.mp3"))
-        mp3 = s / "tutorial.mp3"
-        size = f"{mp3.stat().st_size // 1024} KB" if mp3.exists() else "—"
+        units = list((s / "tutorial_units").glob("unit_*.mp3"))
+        meta = _read_meta(s / "tutorial.meta.json")
         has_mp4 = (VIDEO_DIR / s.name / "full_session.mp4").exists()
-        badge = theme.green("  [mp4]") if has_mp4 else ""
-        print(f"  {theme.cyan(s.name):<30} {len(units)} units   {size}{badge}")
-    print(theme.dim("\n  Play with: /play <session-name>"))
-    print(theme.dim("  Generate video: /video <session-name>"))
+
+        dur_str = _format_duration(meta.get("total_duration_s", 0))
+        date_str = (meta.get("generated_at", "") or "")[:10]
+        badge = theme.green("  [video]") if has_mp4 else "         "
+
+        print(
+            f"  {theme.cyan(s.name):<22}"
+            f"  {len(units):>2} units"
+            f"  {dur_str:>6}"
+            f"{badge}"
+            f"  {theme.dim(date_str)}"
+        )
+
+    print(theme.dim(f"\n  Play: /play <name>   Video: /video <name>"))
+    print()
+
+
+def _read_meta(path: Path) -> dict[str, Any]:
+    """Read tutorial.meta.json. Returns empty dict on any error."""
+    try:
+        import json as _json
+
+        result: dict[str, Any] = _json.loads(path.read_text(encoding="utf-8"))
+        return result
+    except Exception:
+        return {}
+
+
+def _format_duration(seconds: Any) -> str:
+    """Convert seconds to M:SS string. Returns blank string if seconds <= 0."""
+    try:
+        secs = float(seconds)
+    except (TypeError, ValueError):
+        return ""
+    if secs <= 0:
+        return ""
+    m, s = divmod(int(secs), 60)
+    return f"{m}:{s:02d}"
     print()
 
 

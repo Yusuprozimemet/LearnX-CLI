@@ -167,11 +167,11 @@ def test_sessions_command_shows_mp4_badge(tmp_path, capsys):
         cmd_sessions([], _ctx())
 
     out = capsys.readouterr().out
-    assert "[mp4]" in out
+    assert "[video]" in out
 
 
 def test_sessions_no_badge_without_mp4(tmp_path, capsys):
-    """cmd_sessions shows no [mp4] when MP4 is absent."""
+    """cmd_sessions shows no [video] when MP4 is absent."""
     from tutor.cli.commands import cmd_sessions
 
     audio_dir = tmp_path / "audio"
@@ -187,4 +187,4 @@ def test_sessions_no_badge_without_mp4(tmp_path, capsys):
         cmd_sessions([], _ctx())
 
     out = capsys.readouterr().out
-    assert "[mp4]" not in out
+    assert "[video]" not in out

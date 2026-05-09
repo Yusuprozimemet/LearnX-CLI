@@ -124,6 +124,15 @@ apt install ffmpeg             # Linux
 > LearnX auto-detects common Windows install paths (including versioned folders like
 > `C:\ffmpeg\ffmpeg-8.x\bin\`) so a terminal restart is not always required.
 
+### Development
+
+```bash
+pip install -e .[dev]
+pre-commit install
+```
+
+After `pre-commit install`, ruff runs automatically on every commit.
+
 ---
 
 ## Shell commands
