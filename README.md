@@ -37,6 +37,15 @@ Turn any Markdown document into an interactive audio tutorial and a fully-produc
 
 ## How it was built — spec-driven development
 
+### v0 — Engineering foundations
+
+| Spec | Feature |
+|---|---|
+| [`specs/v0/day0.md`](specs/v0/day0.md) | Project packaging — `pyproject.toml`, entry point, ruff config |
+| [`specs/v0/day1.md`](specs/v0/day1.md) | CI/CD — GitHub Actions: lint, test, typecheck on every push |
+| [`specs/v0/day2.md`](specs/v0/day2.md) | Type safety — mypy strict, fix all errors, add to CI |
+| [`specs/v0/day3.md`](specs/v0/day3.md) | Pre-commit hooks + session metadata (`/sessions` with duration + date) |
+
 Each feature day had a written specification reviewed and approved before implementation began:
 
 ### v1 — Audio pipeline
