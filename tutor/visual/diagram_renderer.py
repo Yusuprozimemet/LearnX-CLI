@@ -211,13 +211,21 @@ def _render_analogy_fallback(analogy: str, output_path: Path) -> Path:
 # ── Helpers ────────────────────────────────────────────────────────────────
 
 
-def _draw_code_block(draw: ImageDraw.ImageDraw, code: str, font: ImageFont.ImageFont | ImageFont.FreeTypeFont, x: int, y: int) -> None:
+def _draw_code_block(
+    draw: ImageDraw.ImageDraw,
+    code: str,
+    font: ImageFont.ImageFont | ImageFont.FreeTypeFont,
+    x: int,
+    y: int,
+) -> None:
     for line in code.split("\n")[:8]:
         draw.text((x, y), line, font=font, fill=TEXT_PRI)
         y += 22
 
 
-def _load_font(size: int, bold: bool = False, mono: bool = False) -> ImageFont.ImageFont | ImageFont.FreeTypeFont:
+def _load_font(
+    size: int, bold: bool = False, mono: bool = False
+) -> ImageFont.ImageFont | ImageFont.FreeTypeFont:
     if mono:
         names = ["Consolas", "Courier New", "DejaVu Sans Mono"]
     elif bold:

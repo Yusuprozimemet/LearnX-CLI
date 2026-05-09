@@ -155,7 +155,9 @@ def _save_chunks(chunks: list[Chunk], output_path: str) -> None:
         json.dump([asdict(c) for c in chunks], f, indent=2, ensure_ascii=False)
 
 
-def _run_audio(args: argparse.Namespace, units: list[TeachingUnit], script: list[DialogueLine]) -> None:
+def _run_audio(
+    args: argparse.Namespace, units: list[TeachingUnit], script: list[DialogueLine]
+) -> None:
     script_path = Path(args.output).with_suffix(".script.txt")
     units_dir = str(Path(args.output).parent / "tutorial_units")
 

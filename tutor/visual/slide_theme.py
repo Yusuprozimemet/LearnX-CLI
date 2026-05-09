@@ -71,7 +71,9 @@ FONT_SANS_FALLBACK = ["Segoe UI", "Arial", "DejaVu Sans"]
 FONT_MONO_FALLBACK = ["Consolas", "Courier New", "DejaVu Sans Mono"]
 
 
-def _load_font(size: int, bold: bool = False, mono: bool = False) -> ImageFont.ImageFont | ImageFont.FreeTypeFont:
+def _load_font(
+    size: int, bold: bool = False, mono: bool = False
+) -> ImageFont.ImageFont | ImageFont.FreeTypeFont:
     """
     Try bundled TTF → Windows system path → name-based → bitmap default.
     Never raises.

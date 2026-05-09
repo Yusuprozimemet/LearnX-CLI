@@ -20,7 +20,9 @@ def build_srt(
     """
     offsets, durations = _compute_timing(all_lines, unit_durations_s)
     entries: list[str] = []
-    for idx, (line, start, dur) in enumerate(zip(all_lines, offsets, durations, strict=False), start=1):
+    for idx, (line, start, dur) in enumerate(
+        zip(all_lines, offsets, durations, strict=False), start=1
+    ):
         end = start + dur
         text = _wrap_subtitle(line.speaker, line.text)
         entries.append(f"{idx}\n{_format_timestamp(start)} --> {_format_timestamp(end)}\n{text}\n")
