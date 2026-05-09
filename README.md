@@ -1,5 +1,7 @@
 # LearnX CLI
 
+![CI](https://github.com/Yusuprozimemet/LearnX-CLI/actions/workflows/ci.yml/badge.svg)
+
 > **Spec-driven development project** — every feature was designed in a written specification before a single line of code was written. See [`specs/`](specs/) for the full day-by-day spec chain.
 
 Turn any Markdown document into an interactive audio tutorial and a fully-produced MP4 video — all from a branded terminal shell.
