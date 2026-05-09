@@ -62,7 +62,16 @@ Each feature day had a written specification reviewed and approved before implem
 | [`specs/v2/day12.md`](specs/v2/day12.md) | Shell integration — `/video`, `/vsessions`, polish |
 
 Post-implementation fixes are documented in [`fixes/`](fixes/) (fix001–fix013).  
-Architecture plans: [`plan/v1_plan.md`](plan/v1_plan.md) · [`plan/v2_plan.md`](plan/v2_plan.md).
+Architecture plans: [`plan/v1_plan.md`](plan/v1_plan.md) · [`plan/v2_plan.md`](plan/v2_plan.md) · [`plan/v3_plan.md`](plan/v3_plan.md).
+
+### v3 — Conversation-driven slides (planned)
+
+| Spec | Feature |
+|---|---|
+| [`specs/v3/day13.md`](specs/v3/day13.md) | Exact timing capture — `tutorial.timing.json` from audio builder |
+| [`specs/v3/day14.md`](specs/v3/day14.md) | Dialogue-aware visual planner — `SlideSegment` per dialogue block |
+| [`specs/v3/day15.md`](specs/v3/day15.md) | Segment slide renderers — 9 visual types, progress dots |
+| [`specs/v3/day16.md`](specs/v3/day16.md) | Pipeline integration — exact timing, backward compat |
 
 ---
 
