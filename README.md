@@ -44,8 +44,8 @@ Turn any Markdown document into an interactive audio tutorial and a fully-produc
 | Spec | Feature |
 |---|---|
 | [`specs/v0/day0.md`](specs/v0/day0.md) | Project packaging — `pyproject.toml`, entry point, ruff config |
-| [`specs/v0/day1.md`](specs/v0/day1.md) | CI/CD — GitHub Actions: lint, test, typecheck on every push |
-| [`specs/v0/day2.md`](specs/v0/day2.md) | Type safety — mypy strict, fix all errors, add to CI |
+| [`specs/v0/day1.md`](specs/v0/day1.md) | CI — GitHub Actions: lint + format check on every push |
+| [`specs/v0/day2.md`](specs/v0/day2.md) | Type safety — mypy strict, all 77 errors resolved (local only) |
 | [`specs/v0/day3.md`](specs/v0/day3.md) | Pre-commit hooks + session metadata (`/sessions` with duration + date) |
 
 Each feature day had a written specification reviewed and approved before implementation began:
@@ -72,8 +72,8 @@ Each feature day had a written specification reviewed and approved before implem
 | [`specs/v2/day11.md`](specs/v2/day11.md) | Subtitle writer + video assembler — SRT + ffmpeg |
 | [`specs/v2/day12.md`](specs/v2/day12.md) | Shell integration — `/video`, `/vsessions`, polish |
 
-Post-implementation fixes are documented in [`fixes/`](fixes/) (fix001–fix013).  
-Architecture plans: [`plan/v1_plan.md`](plan/v1_plan.md) · [`plan/v2_plan.md`](plan/v2_plan.md) · [`plan/v3_plan.md`](plan/v3_plan.md).
+Post-implementation fixes are documented in [`fixes/`](fixes/) (fix001–fix015).  
+Architecture plans: [`plan/v0_plan.md`](plan/v0_plan.md) · [`plan/v1_plan.md`](plan/v1_plan.md) · [`plan/v2_plan.md`](plan/v2_plan.md) · [`plan/v3_plan.md`](plan/v3_plan.md).
 
 ### v3 — Conversation-driven slides (planned)
 
@@ -327,7 +327,7 @@ Press `/ask` at any point during playback:
 python -m pytest
 ```
 
-40 tests across ingestion, generation, audio, and player modules. No API keys required — all LLM calls are mocked.
+220 tests across ingestion, generation, audio, player, visual, and CLI modules. No API keys required — all LLM calls are mocked.
 
 ---
 
@@ -343,21 +343,24 @@ tutor/
     theme.py            # ANSI colour helpers
   player/               # Audio player
     player.py           # TutorPlayer state machine
-    player_display.py
-    input_handler.py
+    player_display.py   # Status bar and Q&A display
+    input_handler.py    # Cross-platform keyboard input
   generation/           # LLM pipeline
-    curriculum.py
-    dialogue.py
+    curriculum.py       # Teaching unit planning
+    dialogue.py         # Script generation + caching
+    assembler.py        # Intro/outro + line assembly
     visual_planner.py   # Slide plan generation (v2)
   ingestion/            # Document parsing
-    chunker.py
-    summarizer.py
-    doc_analyzer.py
+    chunker.py          # Strategy A/B/C chunking
+    summarizer.py       # Per-chunk LLM summarisation
+    doc_analyzer.py     # Strategy selection + profile
+    parse_content.py    # Markdown content extraction
   qa/                   # Q&A engine
     qa.py
   audio/                # TTS rendering
     audio_builder.py
     tts_renderer.py
+    sanitizer.py        # Code-to-speech substitutions
   visual/               # Video pipeline (v2)
     __init__.py         # run_visual_pipeline() entry point
     slide_compositor.py # Pillow slide layout (1920×1080)
@@ -369,13 +372,22 @@ tutor/
     video_assembler.py  # ffmpeg pipeline
   infra/
     llm.py              # LLM client + config loader
+  assets/               # Fonts and logo resources
+  config.py             # ffmpeg detection and env validation
+  constants.py          # Tuning knobs (WPM, voices, limits)
+  exceptions.py         # TutorError hierarchy
+  inspector.py          # /inspect report printer
+  models.py             # Dataclasses (Chunk, TeachingUnit, VisualSpec …)
   llm_config.toml       # Model names, token budgets, call settings
-  prompts/              # Prompt templates
+  prompts/              # Prompt templates (curriculum, dialogue, qa, visual)
+  tests/                # 220 tests — no API keys required
 specs/
+  v0/                   # Engineering foundations specs (Days 0–3)
   v1/                   # Audio pipeline specs (Days 1–7)
   v2/                   # Video pipeline specs (Days 8–12)
-plan/                   # Architecture planning documents
-fixes/                  # Post-implementation fix notes (fix001–fix013)
-audio/                  # Generated audio sessions
-video/                  # Generated video sessions
+  v3/                   # Conversation-driven slides specs (Days 13–16, planned)
+plan/                   # Architecture planning documents (v0–v3)
+fixes/                  # Post-implementation fix notes (fix001–fix015)
+audio/                  # Generated audio sessions (gitignored)
+video/                  # Generated video sessions (gitignored)
 ```
