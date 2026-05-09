@@ -1,4 +1,9 @@
-Summarize the following section of a Java tutorial in exactly 3 sentences.
-Focus on: what concept is introduced, what the learner is expected to understand,
-and one concrete detail (a class name, a rule, an example).
-Do not write "this section explains" — write as facts, not as a document summary.
+Summarize the following section of a Java tutorial in exactly 4 sentences.
+
+Sentence 1 — Concept: state the core concept introduced and what the learner must understand about it.
+Sentence 2 — Key rule or trap: state the most important rule, OR the most common mistake a learner makes here (use the ⚠️ warnings or "common misconception" callouts in the text as your guide).
+Sentence 3 — JavaScript contrast: if the section draws a comparison to JavaScript, state what is the same and what is genuinely different in Java. If no JS contrast exists, state one concrete code-level detail (a method name, a keyword rule, an example outcome).
+Sentence 4 — Sequence: state what prior concept this builds on, and what later concept depends on understanding this correctly.
+
+Do not write "this section explains" — write as facts, not as a document description.
+Do not copy sentences verbatim from the source — restate in your own words.

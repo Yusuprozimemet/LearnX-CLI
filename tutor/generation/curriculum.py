@@ -88,6 +88,8 @@ def plan(
                 question_style=u.get("question_style", "recall"),
                 memory_hook=u.get("memory_hook", ""),
                 prerequisite_concepts=u.get("prerequisite_concepts", []),
+                js_contrast=u.get("js_contrast", ""),
+                production_relevance=u.get("production_relevance", ""),
             )
         )
 

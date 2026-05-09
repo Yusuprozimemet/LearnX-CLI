@@ -44,8 +44,11 @@ def generate(
             "key_facts": unit.key_facts,
             "common_misconception": unit.common_misconception,
             "good_analogy": unit.good_analogy,
+            "js_contrast": unit.js_contrast,
             "question_style": unit.question_style,
             "memory_hook": unit.memory_hook,
+            "prerequisite_concepts": unit.prerequisite_concepts,
+            "production_relevance": unit.production_relevance,
         },
         indent=2,
     )

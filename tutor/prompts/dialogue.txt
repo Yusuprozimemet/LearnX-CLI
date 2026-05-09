@@ -1,4 +1,4 @@
-You are writing a tutoring audio script for Java learners.
+You are writing a tutoring audio script for Java learners who already know JavaScript.
 
 FORMAT: {format}
 If tutor-student: ALEX is the tutor (explains, corrects), MAYA is the student
@@ -9,39 +9,56 @@ If dual-tutor: ALEX explains and lays out the standard rule, SAM challenges,
 WORD BUDGET: write approximately {word_budget} words total (±15%).
 
 CODE IN SPEECH: Never write symbols that cannot be spoken.
-  List<String>  →  "a List of Strings"
-  !=            →  "not equal to"
-  ==            →  "double equals"
-  .equals()     →  "dot equals"
-  @Override     →  "Override annotation"
-  int[]         →  "int array"
+  List<String>    →  "a List of Strings"
+  !=              →  "not equal to"
+  ==              →  "double equals"
+  .equals()       →  "dot equals"
+  @Override       →  "the Override annotation"
+  int[]           →  "int array"
+  super()         →  "super constructor call"
+  try-catch       →  "try-catch block"
+  instanceof      →  "instance of"
+  extends         →  "extends"
+  implements      →  "implements"
+  throws          →  "throws declaration"
 
 RULES:
-- Start with a hook (a question or observation that creates tension before explaining).
+- Start with a hook (a question or short scenario that creates tension before explaining).
 - Use the provided analogy exactly. Do not invent a different one.
+- If js_contrast is non-empty, work it into the explanation — say explicitly what is
+  the same and what is different from JavaScript. This is the fastest path to correct
+  mental models for this student.
 - MAYA/SAM must voice the common_misconception from the unit data, not a generic error.
-- End with the memory_hook phrase spoken naturally in a sentence.
-- No "Excellent!", "Great!", "Absolutely!". Acknowledge and continue.
+- End with the memory_hook phrase spoken naturally in a sentence, followed by the
+  production_relevance in one sentence grounding the concept in real backend work.
+- No "Excellent!", "Great!", "Absolutely!", "Certainly!". Acknowledge and continue.
 - Output only labeled lines: ALEX: ... / MAYA: ... / SAM: ...
 - No blank lines between turns. No stage directions.
+- If prerequisite_concepts is non-empty, ALEX opens with a one-sentence callback to
+  that prior concept before the hook — this shows the student how today's topic connects.
 
 tutor-student beat structure (follow this order):
-1. ALEX — Hook: question before any explanation
-2. ALEX — Analogy: ground the concept in 2 sentences
-3. ALEX — Explain: one concise factual explanation tied to the analogy
-4. ALEX — Question (style from the unit's question_style field)
-5. MAYA — Wrong/partial answer (must match common_misconception)
-6. ALEX — Code contrast or hint (spoken as English)
-7. MAYA — Corrected answer
-8. ALEX — Confirm + gotcha (one surprising edge case)
-9. ALEX — Memory hook + bridge to next unit
+1. ALEX — Callback (only if prerequisite_concepts non-empty): one sentence linking to prior concept
+2. ALEX — Hook: a question or scenario before any explanation
+3. ALEX — Analogy: ground the concept in 2 sentences using the provided analogy
+4. ALEX — JS contrast (only if js_contrast non-empty): one sentence on same/different vs JavaScript
+5. ALEX — Explain: one concise factual explanation tied to the analogy
+6. ALEX — Question (style from the unit's question_style field)
+7. MAYA — Wrong/partial answer (must match common_misconception exactly)
+8. ALEX — Code contrast or hint (spoken as English, no symbols)
+9. MAYA — Corrected answer
+10. ALEX — Confirm + gotcha (one surprising edge case from the source material)
+11. ALEX — Memory hook + production relevance (why this matters in real backend code)
 
 dual-tutor beat structure (follow this order):
-1. ALEX — State the concept and the standard rule
-2. SAM — Probe: "but what about..." or "what I see people miss is..."
-3. ALEX — Clarify or add nuance
-4. SAM — Voice the beginner doubt: "so if I understand right..."
-5. ALEX — Confirm + sharpen
-6. SAM — Practical question: "when would you actually reach for this?"
-7. ALEX — Answer with real-world context
-8. SAM — Memory hook (SAM delivers it, feels more natural as a peer takeaway)
+1. ALEX — Callback (only if prerequisite_concepts non-empty): one sentence linking to prior concept
+2. ALEX — State the concept and the standard rule
+3. SAM — JS contrast (only if js_contrast non-empty): "coming from JavaScript, I expected..."
+4. ALEX — Clarify or confirm the contrast
+5. SAM — Probe: "but what about..." or "what I see people miss is..."
+6. ALEX — Clarify or add nuance, including the gotcha
+7. SAM — Voice the beginner doubt: "so if I understand right..."
+8. ALEX — Confirm + sharpen
+9. SAM — Practical question: "when would you actually use this in production?"
+10. ALEX — Answer with real backend context (Spring Boot / REST / database layer)
+11. SAM — Memory hook (SAM delivers it as a peer takeaway)

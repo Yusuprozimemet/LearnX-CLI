@@ -6,6 +6,12 @@ Target duration: {duration_min} minutes
 Difficulty: {difficulty}
 Student level description: {difficulty_context}
 
+STUDENT BACKGROUND: The student already knows JavaScript. They understand
+functions, objects, prototypes, and dynamic typing. Use this to calibrate:
+- If Java behaves the same as JS, note it briefly and move on.
+- If Java behaves differently, make the contrast the centre of the unit.
+- Never explain what a variable or loop is from scratch.
+
 Your job: identify 3–8 concepts where learners most commonly get stuck or form a
 wrong mental model. For each, assign a complexity score 1–3:
   1 = single rule, one key fact, can be taught in ~200 words
@@ -15,9 +21,28 @@ wrong mental model. For each, assign a complexity score 1–3:
 Do not just list topics — find the specific wrong belief a beginner forms and
 design the unit to correct it. Each unit must cite source_sections by chunk ID.
 
-Java traps to prioritize: pass-by-value confusion, String == vs .equals(),
-checked vs unchecked exceptions, interface vs abstract class, final ≠ immutable,
-hashCode contract, autoboxing surprises.
+Sequence awareness: the student works through files in order (week2/1.md,
+week2/2.md, …). If a unit depends on a concept from an earlier file in the same
+session, list it in prerequisite_concepts so the dialogue can reference it.
+If a concept is the foundation for a later file (e.g. inheritance is required
+for polymorphism), note that in the memory_hook.
+
+Java traps to prioritise — pick those most relevant to the source content:
+  is-a vs has-a (inheritance vs composition — the #1 OOP design mistake)
+  super() must be the first statement in a subclass constructor
+  @Override must always be used — silent typo override is a real production bug
+  private fields are NOT inherited — access them only through getters
+  overriding vs overloading — completely different mechanisms
+  interface vs abstract class — when to choose which
+  instanceof overuse — signals a missing polymorphism opportunity
+  dynamic dispatch — the runtime decides the method, not the declared type
+  checked vs unchecked exceptions — compiler enforces checked; unchecked are silent
+  never swallow exceptions silently (empty catch block)
+  equals() and hashCode() always go together — break one, break both
+  == vs .equals() for Strings and objects
+  pass-by-value confusion (references are passed by value)
+  autoboxing surprises (Integer == Integer fails above 127)
+  final ≠ immutable
 
 Java concept map for reference:
 Tier 0 — JVM mental model
@@ -30,27 +55,41 @@ Tier 1 — Type system
 
 Tier 2 — OOP mechanics
   ├─ constructors and this()
-  ├─ inheritance and super
-  ├─ method overloading vs. overriding
+  ├─ inheritance: extends, super(), method overriding, @Override
+  ├─ is-a (inheritance) vs has-a (composition)
+  ├─ what is and is not inherited (private, constructors)
+  ├─ method overloading vs overriding
   └─ final: variable / method / class differences
 
-Tier 3 — Core contracts
-  ├─ equals() and hashCode() contract
-  ├─ == vs. .equals() for Strings and objects
-  ├─ Comparable vs. Comparator
-  └─ interface vs. abstract class
+Tier 3 — Contracts and polymorphism
+  ├─ interface as contract (implements, default, static methods)
+  ├─ interface vs abstract class — decision criteria
+  ├─ interface segregation (small, focused contracts)
+  ├─ Comparable and Iterable from the standard library
+  ├─ compile-time polymorphism (overloading)
+  ├─ runtime polymorphism (dynamic dispatch, @Override)
+  ├─ declaring variables by interface/superclass type
+  └─ instanceof — correct use and when it signals a design problem
 
-Tier 4 — Collections
+Tier 4 — Core contracts
+  ├─ equals() and hashCode() contract
+  ├─ == vs .equals() for Strings and objects
+  └─ Comparable vs Comparator
+
+Tier 5 — Collections
   ├─ List / Set / Map interfaces
-  ├─ ArrayList vs. LinkedList
+  ├─ ArrayList vs LinkedList
   └─ HashMap internals (buckets, load factor)
 
-Tier 5 — Error handling
-  ├─ checked vs. unchecked exceptions
-  ├─ try-with-resources
-  └─ when to throw vs. when to handle
+Tier 6 — Error handling
+  ├─ exception hierarchy: Throwable → Error / Exception → RuntimeException
+  ├─ checked vs unchecked exceptions
+  ├─ try-catch, finally, try-with-resources
+  ├─ throw vs throws
+  ├─ custom exception classes with domain context
+  └─ best practices: specific catches, fail fast, never swallow silently
 
-Tier 6 — Concurrency (advanced)
+Tier 7 — Concurrency (advanced)
   ├─ thread safety and shared state
   ├─ synchronized and the monitor lock
   └─ volatile and visibility
@@ -64,7 +103,9 @@ Respond with a raw JSON array only. No text outside the array. Each element must
 - complexity (integer 1, 2, or 3)
 - key_facts (array of strings, 2–4 items)
 - common_misconception (string — the specific wrong belief a beginner forms)
-- good_analogy (string — a concrete analogy grounded in code reality)
+- good_analogy (string — a concrete analogy grounded in code reality, not a vague metaphor)
+- js_contrast (string — one sentence: "In JavaScript X; in Java Y" — or empty string if not applicable)
 - question_style (string — one of: recall, error-spotting, judgment, predict-output, teach-back)
-- memory_hook (string — one memorable sentence the student should retain)
+- memory_hook (string — one memorable sentence the student must retain; if this concept is foundational for a later topic, say so)
 - prerequisite_concepts (array of strings, may be empty)
+- production_relevance (string — one sentence connecting this concept to real backend work: Spring Boot, REST APIs, database layers, or microservices)

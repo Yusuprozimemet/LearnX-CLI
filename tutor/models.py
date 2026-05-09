@@ -42,6 +42,8 @@ class TeachingUnit:
     question_style: str
     memory_hook: str
     prerequisite_concepts: list[str] = field(default_factory=list)
+    js_contrast: str = ""
+    production_relevance: str = ""
 
 
 @dataclass
