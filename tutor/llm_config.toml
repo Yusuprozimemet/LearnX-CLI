@@ -29,7 +29,7 @@ visual     = "google/gemma-3-27b-it:free"
 
 [max_tokens]
 curriculum = 2000
-dialogue   = 1500
+dialogue   = 2000
 summarize  = 400
 qa         = 600
 visual     = 1200
@@ -43,7 +43,7 @@ visual     = 1200
 #   → max_source_tokens ≤ 3 670  (currently 1 500 for a comfortable margin)
 
 [limits]
-max_source_tokens          = 1500
+max_source_tokens          = 3000
 max_summarize_input_tokens = 3000
 max_visual_source_tokens   = 800
 
