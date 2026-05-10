@@ -398,7 +398,11 @@ def _cache_path(unit_index: int, lines: list[DialogueLine]) -> Path:
 def _load_unit_lines(units_json_path: Path) -> dict[int, tuple[str, list[DialogueLine]]]:
     """Parse tutorial.units.json.
     Returns dict: unit_number → (concept, list[DialogueLine]).
-    Only includes teaching units (unit_number >= 1)."""
+    Only includes teaching units (unit_number >= 1).
+    Falls back to script.txt + timing.json when units.json has no lines.
+    """
+    import re
+
     raw_units = json.loads(units_json_path.read_text(encoding="utf-8"))
     result: dict[int, tuple[str, list[DialogueLine]]] = {}
     for u in raw_units:
@@ -409,4 +413,63 @@ def _load_unit_lines(units_json_path: Path) -> dict[int, tuple[str, list[Dialogu
         raw_lines = u.get("lines", [])
         lines = [DialogueLine(**ln) for ln in raw_lines]
         result[unit_num] = (concept, lines)
+
+    # If no lines in units.json, fall back to script.txt
+    if any(len(lines) > 0 for _, lines in result.values()):
+        return result
+
+    script_path = units_json_path.parent / "tutorial.script.txt"
+    if not script_path.exists():
+        return result
+
+    speaker_re = re.compile(r"^(ALEX|MAYA|SAM):\s*(.+)$")
+    all_pairs = [
+        (m.group(1), m.group(2))
+        for ln in script_path.read_text(encoding="utf-8").splitlines()
+        if (m := speaker_re.match(ln.strip()))
+    ]
+    if not all_pairs:
+        return result
+
+    # Use timing.json line counts if available (most accurate)
+    timing_path = units_json_path.parent / "tutorial.timing.json"
+    lines_per_unit: dict[int, int] = {}
+    if timing_path.exists():
+        try:
+            timing = json.loads(timing_path.read_text(encoding="utf-8"))
+            if timing.get("version") == 1:
+                for uk, entries in timing.get("units", {}).items():
+                    lines_per_unit[int(uk)] = len(entries)
+        except Exception:
+            pass
+
+    if lines_per_unit and all(u in lines_per_unit for u in result):
+        n_teaching = sum(lines_per_unit.values())
+        n_non = max(0, len(all_pairs) - n_teaching)
+        n_intro = (n_non + 1) // 2  # round up: first half are intro
+        cursor = n_intro
+        for unit_num in sorted(result.keys()):
+            concept = result[unit_num][0]
+            count = lines_per_unit[unit_num]
+            pairs = all_pairs[cursor : cursor + count]
+            cursor += count
+            result[unit_num] = (
+                concept,
+                [DialogueLine(speaker=s, text=t, unit_number=unit_num) for s, t in pairs],
+            )
+    else:
+        # Proportional distribution fallback
+        n_units = len(result)
+        n_lines = len(all_pairs)
+        per_unit = max(1, n_lines // max(n_units, 1))
+        for i, unit_num in enumerate(sorted(result.keys())):
+            concept = result[unit_num][0]
+            start = i * per_unit
+            end = n_lines if i == n_units - 1 else min(start + per_unit, n_lines)
+            pairs = all_pairs[start:end]
+            result[unit_num] = (
+                concept,
+                [DialogueLine(speaker=s, text=t, unit_number=unit_num) for s, t in pairs],
+            )
+
     return result

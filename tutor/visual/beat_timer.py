@@ -5,6 +5,7 @@ No ffmpeg, no Pillow, no LLM here.
 
 from pathlib import Path
 
+from tutor.constants import SILENCE_TURN_MS
 from tutor.models import DialogueLine, SlideSegment, VisualSpec
 
 MIN_SLIDE_DURATION = 3.0  # seconds
@@ -55,12 +56,15 @@ def compute_slide_timings_v3(
 def _exact_duration(seg: SlideSegment, unit_timing: list[dict]) -> float:
     """
     Look up timing entries for lines_start and lines_end in unit_timing.
+    Adds SILENCE_TURN_MS per line to account for inter-line silence baked into the MP3.
     Falls back to proportional if either index is out of range.
     """
     try:
         start_ms = unit_timing[seg.lines_start]["start_ms"]
         end_ms = unit_timing[seg.lines_end]["end_ms"]
-        return max((end_ms - start_ms) / 1000.0, MIN_SLIDE_DURATION)
+        n_lines = seg.lines_end - seg.lines_start + 1
+        adjusted_ms = (end_ms - start_ms) + n_lines * SILENCE_TURN_MS
+        return max(adjusted_ms / 1000.0, MIN_SLIDE_DURATION)
     except (IndexError, KeyError, TypeError):
         total_lines = len(unit_timing) if unit_timing else 1
         return _proportional_duration(seg, 30.0, total_lines)

@@ -138,6 +138,66 @@ def test_image_dimensions_are_1920x1080(tmp_path: Path) -> None:
         assert img.size == (1920, 1080), f"{p.name}: expected 1920×1080, got {img.size}"
 
 
+def test_screenshot_uses_file_url_not_set_content(tmp_path: Path) -> None:
+    """_screenshot must call page.goto with a file:// URL, never page.set_content."""
+    from unittest.mock import MagicMock, patch
+
+    from tutor.visual.slide_renderer import _screenshot
+
+    mock_page = MagicMock()
+    out = tmp_path / "out.png"
+
+    with (
+        patch("tutor.visual.slide_renderer.tempfile.NamedTemporaryFile") as mock_ntf,
+        patch("tutor.visual.slide_renderer.os.unlink"),
+    ):
+        mock_file = MagicMock()
+        mock_file.__enter__ = lambda s: s
+        mock_file.__exit__ = MagicMock(return_value=False)
+        mock_file.name = str(tmp_path / "tmp.html")
+        mock_ntf.return_value = mock_file
+        _screenshot(mock_page, "<html></html>", out, False, False)
+
+    mock_page.goto.assert_called_once()
+    call_url = mock_page.goto.call_args[0][0]
+    assert call_url.startswith("file:///")
+    mock_page.set_content.assert_not_called()
+
+
+def test_tmp_file_cleaned_up_after_screenshot(tmp_path: Path) -> None:
+    """Temp HTML file must be deleted even if screenshot succeeds."""
+    import os
+    from unittest.mock import MagicMock
+
+    from tutor.visual.slide_renderer import _screenshot
+
+    recorded: list[str] = []
+
+    mock_page = MagicMock()
+    out = tmp_path / "out.png"
+
+    original_unlink = os.unlink
+
+    def tracking_unlink(path: str) -> None:
+        recorded.append(path)
+        try:
+            original_unlink(path)
+        except OSError:
+            pass
+
+    import tutor.visual.slide_renderer as sr
+
+    original = sr.os.unlink
+    sr.os.unlink = tracking_unlink  # type: ignore[assignment]
+    try:
+        _screenshot(mock_page, "<html></html>", out, False, False)
+    finally:
+        sr.os.unlink = original  # type: ignore[assignment]
+
+    assert len(recorded) == 1
+    assert recorded[0].endswith(".html")
+
+
 @pytest.mark.slow
 def test_invalid_mermaid_does_not_crash(tmp_path: Path) -> None:
     title_spec = _make_spec()

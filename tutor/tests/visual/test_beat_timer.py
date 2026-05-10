@@ -163,8 +163,9 @@ def test_exact_duration_from_timing_json() -> None:
         [30.0],
     )
     # title, seg, outro
+    # raw = 3240ms, +1 line * SILENCE_TURN_MS(500ms) = 3740ms = 3.74 s
     seg_dur = timings[1][1]
-    assert seg_dur == pytest.approx(3.24, abs=0.01)
+    assert seg_dur == pytest.approx(3.74, abs=0.01)
 
 
 def test_exact_duration_uses_lines_start_and_end() -> None:
@@ -184,8 +185,8 @@ def test_exact_duration_uses_lines_start_and_end() -> None:
         tj,
         [30.0],
     )
-    # start_ms = 2000, end_ms = 9000 → 7.0 s
-    assert timings[1][1] == pytest.approx(7.0, abs=0.01)
+    # raw = 9000-2000 = 7000ms, +3 lines * SILENCE_TURN_MS(500ms) = 8500ms = 8.5 s
+    assert timings[1][1] == pytest.approx(8.5, abs=0.01)
 
 
 def test_proportional_fallback_when_timing_absent() -> None:
@@ -246,6 +247,35 @@ def test_all_segments_present_in_output() -> None:
     )
     # title + 3 + 2 + outro = 7
     assert len(timings) == 7
+
+
+def test_timing_gap_accounted_in_exact_duration() -> None:
+    from tutor.constants import SILENCE_TURN_MS
+    from tutor.visual.beat_timer import _exact_duration
+
+    seg = _make_seg(lines_start=0, lines_end=2)  # 3 lines
+    unit_timing = [
+        {"line_index": 0, "start_ms": 0, "end_ms": 1000},
+        {"line_index": 1, "start_ms": 1500, "end_ms": 2500},
+        {"line_index": 2, "start_ms": 3000, "end_ms": 4000},
+    ]
+    raw_ms = 4000 - 0  # end_ms of last - start_ms of first
+    expected_s = (raw_ms + 3 * SILENCE_TURN_MS) / 1000.0
+    assert _exact_duration(seg, unit_timing) == pytest.approx(expected_s, abs=0.01)
+
+
+def test_single_line_segment_includes_one_gap() -> None:
+    from tutor.constants import SILENCE_TURN_MS
+    from tutor.visual.beat_timer import MIN_SLIDE_DURATION, _exact_duration
+
+    seg = _make_seg(lines_start=1, lines_end=1)  # 1 line
+    unit_timing = [
+        {"line_index": 0, "start_ms": 0, "end_ms": 800},
+        {"line_index": 1, "start_ms": 1300, "end_ms": 5500},  # long enough to exceed MIN
+    ]
+    raw_ms = 5500 - 1300
+    expected_s = max((raw_ms + 1 * SILENCE_TURN_MS) / 1000.0, MIN_SLIDE_DURATION)
+    assert _exact_duration(seg, unit_timing) == pytest.approx(expected_s, abs=0.01)
 
 
 def test_v2_function_still_callable() -> None:
