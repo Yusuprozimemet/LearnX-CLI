@@ -1,0 +1,12 @@
+{% extends "_base.html.j2" %}
+{% block content %}
+<div class="definition-slide">
+  <h1 class="definition-term">{{ seg.title | e }}</h1>
+  {% if seg.body %}
+  <p class="definition-text">{{ seg.body | e }}</p>
+  {% endif %}
+  {% if seg.code %}
+  <pre><code class="language-{{ seg.language or 'java' }}">{{ seg.code | e }}</code></pre>
+  {% endif %}
+</div>
+{% endblock %}

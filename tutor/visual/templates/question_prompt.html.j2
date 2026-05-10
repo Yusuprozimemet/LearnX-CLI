@@ -1,0 +1,10 @@
+{% extends "_base.html.j2" %}
+{% block content %}
+<div class="question-slide">
+  {% set speaker = seg.title.split(':')[0].strip().upper() if seg.title and ':' in seg.title else 'MAYA' %}
+  <span class="speaker-badge {% if speaker == 'SAM' %}badge-sam{% else %}badge-maya{% endif %}">
+    {{ speaker }}
+  </span>
+  <p class="question-text">{{ seg.body | e if seg.body else seg.title | e }}</p>
+</div>
+{% endblock %}

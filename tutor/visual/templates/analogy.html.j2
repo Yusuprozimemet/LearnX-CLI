@@ -1,0 +1,14 @@
+{% extends "_base.html.j2" %}
+{% block content %}
+<div class="analogy-slide">
+  <div class="analogy-panel">
+    <div class="analogy-label">{{ seg.left | e }}</div>
+    <div class="analogy-body">{{ (seg.rows[0][0] if seg.rows else '') | e }}</div>
+  </div>
+  <div class="analogy-sep">&#8776;</div>
+  <div class="analogy-panel">
+    <div class="analogy-label">{{ seg.right | e }}</div>
+    <div class="analogy-body">{{ (seg.rows[0][1] if seg.rows else '') | e }}</div>
+  </div>
+</div>
+{% endblock %}

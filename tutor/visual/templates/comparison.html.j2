@@ -1,0 +1,27 @@
+{% extends "_base.html.j2" %}
+{% block content %}
+<div class="comparison-slide">
+  <table class="comparison-table">
+    <thead>
+      <tr>
+        <th class="th-left">{{ seg.left | e }}</th>
+        <th class="th-right">{{ seg.right | e }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% set rows = seg.rows or [] %}
+      {% for row in rows[:6] %}
+      <tr>
+        <td>{{ row[0] | e }}</td>
+        <td>{{ row[1] | e }}</td>
+      </tr>
+      {% endfor %}
+      {% if rows | length > 6 %}
+      <tr>
+        <td colspan="2" class="td-ellipsis">…</td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

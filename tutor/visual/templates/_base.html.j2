@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080">
+<link rel="stylesheet" href="{{ asset_dir }}/slide_base.css">
+<link rel="stylesheet" href="{{ asset_dir }}/theme-learnx-dark.css">
+<script src="{{ asset_dir }}/highlight.min.js"></script>
+<script src="{{ asset_dir }}/highlight-java.min.js"></script>
+<script src="{{ asset_dir }}/highlight-python.min.js"></script>
+<script src="{{ asset_dir }}/highlight-javascript.min.js"></script>
+<script src="{{ asset_dir }}/mermaid.min.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    if (typeof hljs !== 'undefined') { hljs.highlightAll(); }
+    if (typeof mermaid !== 'undefined') { mermaid.initialize({startOnLoad: true, theme: 'dark'}); }
+  });
+</script>
+</head>
+<body>
+<div class="top-bar">
+  {% block top_bar %}
+  {% if seg is defined %}Unit {{ seg.unit_index }} &middot; {{ seg.title | e }}{% endif %}
+  {% endblock %}
+</div>
+<div class="content">
+  {% block content %}{% endblock %}
+</div>
+<div class="footer-bar">
+  {% block footer %}
+  {% if total_dots is defined %}
+    {% for i in range(total_dots) %}
+      <span class="dot {% if i < current_dot %}dot--filled{% else %}dot--hollow{% endif %}"></span>
+    {% endfor %}
+  {% endif %}
+  {% endblock %}
+</div>
+</body>
+</html>
