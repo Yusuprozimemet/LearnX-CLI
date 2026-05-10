@@ -79,10 +79,10 @@ Architecture plans: [`plan/v0_plan.md`](plan/v0_plan.md) · [`plan/v1_plan.md`](
 
 | Spec | Feature |
 |---|---|
-| [`specs/v3/day13.md`](specs/v3/day13.md) | Exact timing capture — `tutorial.timing.json` from audio builder |
-| [`specs/v3/day14.md`](specs/v3/day14.md) | Dialogue-aware visual planner — `SlideSegment` per dialogue block |
-| [`specs/v3/day15.md`](specs/v3/day15.md) | Segment slide renderers — 9 visual types, progress dots |
-| [`specs/v3/day16.md`](specs/v3/day16.md) | Pipeline integration — exact timing, backward compat |
+| [`specs/v3/day13.md`](specs/v3/day13.md) | Exact timing capture — `tutorial.timing.json` written during audio assembly |
+| [`specs/v3/day14.md`](specs/v3/day14.md) | Dialogue-aware segment planner — new `segment_planner.py`; 10 visual types including `diagram` |
+| [`specs/v3/day15.md`](specs/v3/day15.md) | HTML slide renderer — Playwright + Jinja2 replaces Pillow; Mermaid diagrams; highlight.js code |
+| [`specs/v3/day16.md`](specs/v3/day16.md) | Pipeline integration — exact timing, subtitle sync, backward compat |
 
 ---
 
