@@ -1,0 +1,7 @@
+{% extends "_base.html.j2" %}
+{% block content %}
+<div class="key-insight-slide">
+  <p class="key-insight-text">{{ seg.body | e if seg.body else seg.title | e }}</p>
+  <div class="key-insight-rule"></div>
+</div>
+{% endblock %}

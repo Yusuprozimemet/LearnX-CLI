@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080">
+<link rel="stylesheet" href="{{ asset_dir }}/slide_base.css">
+<link rel="stylesheet" href="{{ asset_dir }}/theme-learnx-dark.css">
+</head>
+<body>
+<div class="top-bar">LearnX</div>
+<div class="content">
+  <div class="outro-slide">
+    <p class="outro-text">{{ spec.title | e if spec is defined and spec.title is defined else 'Thanks for watching!' }}</p>
+    {% if spec is defined and spec.subtitle is defined and spec.subtitle %}
+    <p class="outro-sub">{{ spec.subtitle | e }}</p>
+    {% endif %}
+  </div>
+</div>
+<div class="footer-bar"></div>
+</body>
+</html>

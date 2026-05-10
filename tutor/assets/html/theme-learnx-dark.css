@@ -1,0 +1,12 @@
+/* highlight.js dark theme matching LearnX palette */
+.hljs { background: #161b22; color: #e6edf3; }
+.hljs-comment, .hljs-quote { color: #8b949e; font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-built_in { color: #00b4d8; font-weight: 600; }
+.hljs-string, .hljs-attr { color: #3fb950; }
+.hljs-number, .hljs-literal { color: #e3a21a; }
+.hljs-variable, .hljs-template-variable { color: #e6edf3; }
+.hljs-type, .hljs-class .hljs-title { color: #00b4d8; font-weight: 700; }
+.hljs-function .hljs-title, .hljs-title.function_ { color: #e6edf3; }
+.hljs-meta { color: #8b949e; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: bold; }

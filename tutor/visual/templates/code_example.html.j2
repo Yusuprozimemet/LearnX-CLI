@@ -1,0 +1,11 @@
+{% extends "_base.html.j2" %}
+{% block content %}
+<div class="code-slide">
+  {% if seg.body %}
+  <p class="code-desc">{{ seg.body | e }}</p>
+  {% endif %}
+  {% if seg.code %}
+  <pre><code class="language-{{ seg.language or 'java' }}">{{ seg.code | e }}</code></pre>
+  {% endif %}
+</div>
+{% endblock %}
