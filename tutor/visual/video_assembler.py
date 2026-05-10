@@ -268,52 +268,6 @@ def _embed_subtitles(video: Path, srt: Path, output: Path) -> Path:
     return output
 
 
-def _normalize_audio(video: Path, output: Path) -> Path:
-    # Step 1: normalize audio stream only (no video — avoids timing issues
-    #         with image-based concat demuxer that has huge inter-frame gaps)
-    norm_audio = video.with_suffix(".norm_tmp.aac")
-    try:
-        _run_ffmpeg(
-            [
-                "ffmpeg",
-                "-y",
-                "-i",
-                str(video),
-                "-vn",
-                "-af",
-                "loudnorm=I=-16:TP=-1.5:LRA=11",
-                "-c:a",
-                "aac",
-                "-b:a",
-                AUDIO_BITRATE,
-                str(norm_audio),
-            ]
-        )
-        # Step 2: mux original video + normalized audio
-        _run_ffmpeg(
-            [
-                "ffmpeg",
-                "-y",
-                "-i",
-                str(video),
-                "-i",
-                str(norm_audio),
-                "-map",
-                "0:v:0",
-                "-map",
-                "1:a:0",
-                "-c:v",
-                "copy",
-                "-c:a",
-                "copy",
-                str(output),
-            ]
-        )
-    finally:
-        norm_audio.unlink(missing_ok=True)
-    return output
-
-
 def _write_concat_script(entries: list[tuple[Path, float]], script_path: Path) -> None:
     lines = ["ffconcat version 1.0"]
     for path, dur in entries:

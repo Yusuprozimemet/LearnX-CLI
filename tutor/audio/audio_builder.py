@@ -122,13 +122,15 @@ def _concat_with_silence(
             cursor_ms += gap
 
         if capture_timing:
-            entries.append(TimingEntry(
-                line_index=idx,
-                speaker=seg.line.speaker,
-                text=seg.line.text,
-                start_ms=cursor_ms,
-                end_ms=cursor_ms + len(audio),
-            ))
+            entries.append(
+                TimingEntry(
+                    line_index=idx,
+                    speaker=seg.line.speaker,
+                    text=seg.line.text,
+                    start_ms=cursor_ms,
+                    end_ms=cursor_ms + len(audio),
+                )
+            )
 
         result += audio
         cursor_ms += len(audio)

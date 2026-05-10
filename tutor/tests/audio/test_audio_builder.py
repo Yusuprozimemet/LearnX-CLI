@@ -2,10 +2,9 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 from pydub import AudioSegment
 
-from tutor.audio.audio_builder import _assemble, _concat_with_silence
+from tutor.audio.audio_builder import _assemble
 from tutor.constants import SILENCE_BREATH_MS, SILENCE_TURN_MS
 from tutor.models import DialogueLine, RenderedSegment
 
@@ -28,16 +27,20 @@ def _run_assemble(tmp_path: Path, segments: list[RenderedSegment]) -> dict:
     units_dir = tmp_path / "units"
     units_dir.mkdir()
 
-    with patch(
-        "tutor.audio.audio_builder.AudioSegment.from_mp3",
-        return_value=AudioSegment.silent(duration=CLIP_MS),
-    ), patch.object(AudioSegment, "export"):
+    with (
+        patch(
+            "tutor.audio.audio_builder.AudioSegment.from_mp3",
+            return_value=AudioSegment.silent(duration=CLIP_MS),
+        ),
+        patch.object(AudioSegment, "export"),
+    ):
         _assemble(segments, str(out_path), str(units_dir))
 
     return json.loads((tmp_path / "tutorial.timing.json").read_text())
 
 
 # ── tests ─────────────────────────────────────────────────────────────────────
+
 
 def test_timing_file_written_after_build(tmp_path):
     segs = [_seg(_line(1, "ALEX")), _seg(_line(1, "MAYA"))]
@@ -62,7 +65,7 @@ def test_timing_keys_are_string_integers(tmp_path):
 
 def test_timing_keys_match_teaching_units(tmp_path):
     segs = [
-        _seg(_line(0, "ALEX")),   # intro — excluded
+        _seg(_line(0, "ALEX")),  # intro — excluded
         _seg(_line(1, "ALEX")),
         _seg(_line(1, "MAYA")),
         _seg(_line(2, "ALEX")),

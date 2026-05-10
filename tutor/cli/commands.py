@@ -1,60 +1,39 @@
 from __future__ import annotations
 
 import argparse
+import datetime
+import json
 import logging
-import threading
-import time
+import os
 from collections.abc import Callable
-from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import Any, TypeAlias
 
 from tutor.cli import theme
-
-if TYPE_CHECKING:
-    from tutor.player.player import TutorPlayer
+from tutor.cli.playback_commands import (
+    cmd_ask,
+    cmd_next,
+    cmd_pause,
+    cmd_play,
+    cmd_prev,
+    cmd_replay,
+    cmd_resume,
+    cmd_status,
+    cmd_stop,
+    cmd_summary,
+)
+from tutor.cli.shell_context import ShellContext  # re-exported for callers
 
 log = logging.getLogger(__name__)
 
 AUDIO_DIR = Path("audio")
 
-
-@dataclass
-class ShellContext:
-    player: TutorPlayer | None = None
-    player_thread: threading.Thread | None = None
-    last_units_dir: Path | None = None
-    current_session: str | None = None
-    last_video: Path | None = None
+CommandFn: TypeAlias = Callable[[list[str], ShellContext], None]
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _require_player(ctx: ShellContext, require_unit: bool = False) -> bool:
-    if not ctx.player:
-        print(theme.red("  No active player. Use /play first."))
-        return False
-    if ctx.player._state == "STOPPED":
-        print(theme.red("  Player has stopped. Use /play to start a new session."))
-        return False
-    if require_unit and ctx.player._current_idx >= len(ctx.player.units):
-        print(theme.red("  No unit loaded."))
-        return False
-    return True
-
-
-def _get_flag(tokens: list[str], flag: str, default: str) -> str:
-    try:
-        idx = tokens.index(flag)
-        return tokens[idx + 1]
-    except (ValueError, IndexError):
-        return default
-
-
-CommandFn: TypeAlias = Callable[[list[str], ShellContext], None]
 
 
 def _parse_generate_args(tokens: list[str]) -> argparse.Namespace | None:
@@ -68,12 +47,10 @@ def _parse_generate_args(tokens: list[str]) -> argparse.Namespace | None:
 
 
 def _apply_log_level(args: argparse.Namespace) -> None:
-    import logging as _logging
-
     if getattr(args, "debug", False):
-        _logging.getLogger().setLevel(_logging.DEBUG)
+        logging.getLogger().setLevel(logging.DEBUG)
     elif getattr(args, "verbose", False):
-        _logging.getLogger().setLevel(_logging.INFO)
+        logging.getLogger().setLevel(logging.INFO)
 
 
 def _session_name(input_path: str) -> str:
@@ -83,26 +60,47 @@ def _session_name(input_path: str) -> str:
     )
 
 
-def _resolve_units_dir(token: str) -> Path | None:
-    """Resolve a token to a tutorial_units directory.
+def _read_meta(path: Path) -> dict[str, Any]:
+    """Read tutorial.meta.json. Returns empty dict on any error."""
+    try:
+        result: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+        return result
+    except Exception:
+        return {}
 
-    Accepts:
-      - a session name  (e.g. "week2_3")  → audio/week2_3/tutorial_units/
-      - a direct path to tutorial_units/  → used as-is
-      - a path to any file inside audio/  → parent/tutorial_units/
-    """
-    p = Path(token)
 
-    # Direct path that exists
-    if p.exists():
-        return p if p.is_dir() else p.parent / "tutorial_units"
+def _format_duration(seconds: Any) -> str:
+    """Convert seconds to M:SS string. Returns blank string if seconds <= 0."""
+    try:
+        secs = float(seconds)
+    except (TypeError, ValueError):
+        return ""
+    if secs <= 0:
+        return ""
+    m, s = divmod(int(secs), 60)
+    return f"{m}:{s:02d}"
 
-    # Session name: look in audio/<name>/tutorial_units/
-    candidate = AUDIO_DIR / token / "tutorial_units"
-    if candidate.exists():
-        return candidate
 
-    return None
+def _write_session_meta(output: Path, input_path: str) -> None:
+    """Write tutorial.meta.json with source file, timestamp, and duration."""
+    duration_s = 0.0
+    full_mp3 = output.parent / "tutorial.mp3"
+    if full_mp3.exists():
+        try:
+            from pydub import AudioSegment
+
+            duration_s = len(AudioSegment.from_mp3(full_mp3)) / 1000.0
+        except Exception:
+            pass
+
+    meta = {
+        "source_file": input_path,
+        "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
+        "total_duration_s": duration_s,
+    }
+    (output.parent / "tutorial.meta.json").write_text(
+        json.dumps(meta, ensure_ascii=False), encoding="utf-8"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -128,14 +126,12 @@ def cmd_generate(tokens: list[str], ctx: ShellContext) -> None:
 
     _apply_log_level(args)
 
-    # Auto-route output into audio/<session>/ unless user specified --output
     if not any(t.startswith("--output") for t in tokens) and args.input:
         session = _session_name(args.input)
         if getattr(args, "explain", False):
             session = session + "_explain"
         args.output = str(AUDIO_DIR / session / "tutorial.mp3")
 
-    # Ensure the output parent directory exists
     if (
         args.input
         and not getattr(args, "dry_run", False)
@@ -160,29 +156,8 @@ def cmd_generate(tokens: list[str], ctx: ShellContext) -> None:
             if getattr(args, "explain", False):
                 session = session + "_explain"
             ctx.current_session = session
-            # Write source metadata so the visual pipeline can find the doc title
             if args.input:
-                import datetime
-                import json as _json
-
-                duration_s = 0.0
-                full_mp3 = output.parent / "tutorial.mp3"
-                if full_mp3.exists():
-                    try:
-                        from pydub import AudioSegment
-
-                        duration_s = len(AudioSegment.from_mp3(full_mp3)) / 1000.0
-                    except Exception:
-                        pass
-
-                meta = {
-                    "source_file": str(args.input),
-                    "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
-                    "total_duration_s": duration_s,
-                }
-                (output.parent / "tutorial.meta.json").write_text(
-                    _json.dumps(meta, ensure_ascii=False), encoding="utf-8"
-                )
+                _write_session_meta(output, str(args.input))
             print(theme.green(f"\n  Generation complete. Session: {theme.bold(session)}"))
             print(theme.dim(f"  Saved to: {output.parent}/"))
             print(theme.green("  Type /play to start listening.\n"))
@@ -228,217 +203,6 @@ def cmd_sessions(tokens: list[str], ctx: ShellContext) -> None:
 
     print(theme.dim("\n  Play: /play <name>   Video: /video <name>"))
     print()
-
-
-def _read_meta(path: Path) -> dict[str, Any]:
-    """Read tutorial.meta.json. Returns empty dict on any error."""
-    try:
-        import json as _json
-
-        result: dict[str, Any] = _json.loads(path.read_text(encoding="utf-8"))
-        return result
-    except Exception:
-        return {}
-
-
-def _format_duration(seconds: Any) -> str:
-    """Convert seconds to M:SS string. Returns blank string if seconds <= 0."""
-    try:
-        secs = float(seconds)
-    except (TypeError, ValueError):
-        return ""
-    if secs <= 0:
-        return ""
-    m, s = divmod(int(secs), 60)
-    return f"{m}:{s:02d}"
-    print()
-
-
-def cmd_play(tokens: list[str], ctx: ShellContext) -> None:
-    """Usage: /play [session-name | path] [--no-qa] [--provider groq|openrouter]
-    session-name: folder name under audio/ (see /sessions)"""
-    # Resolve units_dir
-    unit_token = next((t for t in tokens if not t.startswith("--")), None)
-    if unit_token:
-        units_dir = _resolve_units_dir(unit_token)
-        if units_dir is None:
-            print(theme.red(f"  Session '{unit_token}' not found."))
-            print(theme.dim("  Use /sessions to list available sessions."))
-            return
-    elif ctx.last_units_dir and ctx.last_units_dir.exists():
-        units_dir = ctx.last_units_dir
-    else:
-        print(theme.red("  No session known. Run /generate first or pass a session name."))
-        print(theme.dim("  Use /sessions to list available sessions."))
-        return
-
-    # Resume if already paused
-    if ctx.player and ctx.player._state == "PAUSED":
-        ctx.player._resume()
-        print(theme.green("  Resumed."))
-        return
-
-    if ctx.player and ctx.player._state == "PLAYING":
-        print(theme.yellow("  Already playing. Use /pause, /next, /stop."))
-        return
-
-    # Clear any finished player
-    if ctx.player and ctx.player._state == "STOPPED":
-        if ctx.player_thread:
-            ctx.player_thread.join(timeout=1.0)
-        ctx.player = None
-        ctx.player_thread = None
-
-    from tutor.exceptions import TutorError
-    from tutor.tutor import _build_player
-
-    play_args = argparse.Namespace(
-        audio_file=str(units_dir),
-        provider=_get_flag(tokens, "--provider", "groq"),
-        no_qa="--no-qa" in tokens,
-    )
-    try:
-        player = _build_player(play_args)
-    except TutorError as e:
-        print(theme.red(f"  Error: {e}"))
-        return
-
-    ctx.player = player
-    ctx.last_units_dir = units_dir
-
-    def _run() -> None:
-        player.run_in_shell()
-
-    ctx.player_thread = threading.Thread(target=_run, daemon=True, name="PlayerThread")
-    ctx.player_thread.start()
-    print(theme.green(f"  Playing: {units_dir}"))
-    print(theme.dim("  Controls: /pause  /next  /prev  /stop  /ask  /summary"))
-
-
-def cmd_pause(tokens: list[str], ctx: ShellContext) -> None:
-    """Usage: /pause — pause playback"""
-    if not _require_player(ctx):
-        return
-    assert ctx.player is not None
-    if ctx.player._state != "PLAYING":
-        print(theme.yellow("  Not currently playing."))
-        return
-    ctx.player._pause()
-    print(theme.cyan("  Paused."))
-
-
-def cmd_resume(tokens: list[str], ctx: ShellContext) -> None:
-    """Usage: /resume — resume playback"""
-    if not _require_player(ctx):
-        return
-    assert ctx.player is not None
-    if ctx.player._state != "PAUSED":
-        print(theme.yellow("  Not paused."))
-        return
-    ctx.player._resume()
-    print(theme.green("  Resumed."))
-
-
-def cmd_stop(tokens: list[str], ctx: ShellContext) -> None:
-    """Usage: /stop — stop playback and unload the player"""
-    if not _require_player(ctx):
-        return
-    assert ctx.player is not None
-    ctx.player._quit()
-    if ctx.player_thread:
-        ctx.player_thread.join(timeout=3.0)
-    ctx.player = None
-    ctx.player_thread = None
-    print(theme.cyan("  Stopped."))
-
-
-def cmd_next(tokens: list[str], ctx: ShellContext) -> None:
-    """Usage: /next — jump to the next unit"""
-    if not _require_player(ctx):
-        return
-    assert ctx.player is not None
-    ctx.player._next_unit()
-
-
-def cmd_prev(tokens: list[str], ctx: ShellContext) -> None:
-    """Usage: /prev — jump to the previous unit"""
-    if not _require_player(ctx):
-        return
-    assert ctx.player is not None
-    ctx.player._prev_unit()
-
-
-def cmd_replay(tokens: list[str], ctx: ShellContext) -> None:
-    """Usage: /replay — replay the current unit from the beginning"""
-    if not _require_player(ctx):
-        return
-    assert ctx.player is not None
-    ctx.player._replay_unit()
-
-
-def cmd_ask(tokens: list[str], ctx: ShellContext) -> None:
-    """Usage: /ask [question text]
-    If question is provided inline, skips the prompt. Pauses audio while answering."""
-    if not _require_player(ctx, require_unit=True):
-        return
-    assert ctx.player is not None
-
-    was_playing = ctx.player._state == "PLAYING"
-    if was_playing:
-        ctx.player._pause()
-        time.sleep(0.05)
-
-    question = " ".join(tokens).strip() if tokens else None
-    if not question:
-        try:
-            question = input(theme.cyan("  Your question: ")).strip()
-        except (KeyboardInterrupt, EOFError):
-            print()
-            if was_playing:
-                ctx.player._resume()
-            return
-
-    if not question:
-        if was_playing:
-            ctx.player._resume()
-        return
-
-    ctx.player._ask_question_from_shell(question)
-
-
-def cmd_summary(tokens: list[str], ctx: ShellContext) -> None:
-    """Usage: /summary — print the current unit summary and memory hook"""
-    if not _require_player(ctx, require_unit=True):
-        return
-    assert ctx.player is not None
-    ctx.player._print_summary()
-
-
-def cmd_status(tokens: list[str], ctx: ShellContext) -> None:
-    """Usage: /status — show player state, current unit, elapsed time, Q&A count"""
-    if not ctx.player:
-        print(theme.dim("  No active session."))
-        return
-    p = ctx.player
-    state_icons = {
-        "PLAYING": theme.green("▶ Playing"),
-        "PAUSED": theme.yellow("⏸ Paused"),
-        "STOPPED": theme.dim("■ Stopped"),
-        "ASKING": theme.cyan("? Asking"),
-        "ANSWERING": theme.cyan("⟳ Answering"),
-    }
-    state_str = state_icons.get(p._state, p._state)
-    unit = p.units[p._current_idx] if p._current_idx < len(p.units) else None
-    unit_str = f"Unit {p._current_idx + 1}/{len(p.units)} — {unit.concept}" if unit else "—"
-    elapsed = p._elapsed_seconds()
-    total = p._unit_duration_s()
-    m_el, s_el = divmod(elapsed, 60)
-    m_to, s_to = divmod(total, 60)
-
-    print(f"\n  State:    {state_str}")
-    print(f"  Unit:     {unit_str}")
-    print(f"  Time:     {m_el:02d}:{s_el:02d} / {m_to:02d}:{s_to:02d}")
-    print(f"  Q&A:      {p.qa_count} question(s) this session\n")
 
 
 def cmd_inspect(tokens: list[str], ctx: ShellContext) -> None:
@@ -491,8 +255,6 @@ def cmd_dryrun(tokens: list[str], ctx: ShellContext) -> None:
 
 def cmd_clear(tokens: list[str], ctx: ShellContext) -> None:
     """Usage: /clear — clear the terminal"""
-    import os
-
     os.system("cls" if os.name == "nt" else "clear")
 
 
