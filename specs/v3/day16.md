@@ -1,17 +1,16 @@
-# Day 16 — Pipeline Integration
+# Day 16 — Full Pipeline Integration
 
 ## Goal
 
-Wire the timing data (Day 13), segment plan (Day 14), and new slide renderers
-(Day 15) into a single end-to-end pipeline. Rewrite `beat_timer.py` for
-segment-based timing. Update `subtitle_writer.py` to use exact offsets when the
-timing file is present. Update `tutor/visual/__init__.py` to orchestrate the v3
-flow.
+Wire the timing data (Day 13), segment plan (Day 14), and HTML slide renderer
+(Day 15) into a single end-to-end pipeline. Rewrite `beat_timer.py` to derive
+slide durations from `SlideSegment` objects. Update `subtitle_writer.py` to use
+exact offsets when the timing file is present. Update `tutor/visual/__init__.py`
+to orchestrate the v3 6-step flow.
 
 **Backward compatibility is a hard requirement.** Sessions generated before v3
 (no `tutorial.timing.json`, no `tutorial.segments.json`) must still produce a
-correct video. The v3 pipeline runs by default; it degrades gracefully to
-proportional estimation when timing data is absent.
+correct video by falling back to proportional estimation.
 
 ---
 
@@ -34,9 +33,8 @@ Stop: do not merge to main — wait for human review.
 ```
 Reads (new, optional):
   audio/<session>/tutorial.timing.json       ← from Day 13; absent for pre-v3 sessions
-  video/<session>/tutorial.segments.json     ← from Day 14; generated on every /video run
 
-Reads (unchanged):
+Reads (always):
   audio/<session>/tutorial.units.json
   audio/<session>/tutorial_units/unit_*.mp3
   video/<session>/slides/*.png               ← from Day 15
@@ -46,19 +44,26 @@ Writes (unchanged):
   video/<session>/full_session.mp4
 ```
 
-No LLM calls, no Pillow in `beat_timer.py` or `subtitle_writer.py`.
+No LLM calls, no Pillow calls in `beat_timer.py`, `subtitle_writer.py`, or
+`__init__.py`.
 
 ---
 
 ## Part A — Beat Timer (`tutor/visual/beat_timer.py`)
 
-The v2 beat logic (hook/concept/memory detection by speaker pattern) is removed.
-The new implementation maps each `SlideSegment` to an exact or proportional
-duration.
+The existing `compute_slide_timings()` takes
+`(slides, script_lines, line_start_offsets, visuals, unit_durations_s)` —
+the v2 signature. This function is renamed to `_compute_slide_timings_v2()`
+(private) to preserve its logic for the regression test. A new public
+`compute_slide_timings_v3()` replaces it for the v3 pipeline.
 
-**The v2 function `compute_slide_timings()` is kept** with its original signature —
-it is called by `run_visual_pipeline()` only when no segment plan is available
-(pre-v3 session fallback). New code must not break it.
+### Constants (add alongside existing)
+
+```python
+MIN_SLIDE_DURATION = 3.0   # seconds — already exists, keep unchanged
+TITLE_DURATION     = 4.0   # seconds — already exists as TITLE_CARD_DURATION
+OUTRO_DURATION     = 6.0   # seconds — already exists as OUTRO_CARD_DURATION
+```
 
 ### New public function
 
@@ -71,29 +76,30 @@ def compute_slide_timings_v3(
     unit_durations_s: list[float],
 ) -> list[tuple[Path, float]]:
     """
-    Return [(png_path, duration_seconds), …] in video order, suitable for the
-    ffmpeg concat script. Prepends title card and appends outro with fixed durations.
+    Return [(png_path, duration_seconds), ...] in video order, ready for the
+    ffmpeg concat script. Prepends title card (4.0 s) and appends outro (6.0 s).
 
-    Duration source:
-      - timing_json present  → _exact_duration() for each segment
-      - timing_json absent   → _proportional_duration() for each segment
+    Duration source per segment:
+      timing_json present  → _exact_duration()
+      timing_json absent   → _proportional_duration()
 
-    Minimum per-slide: MIN_SLIDE_DURATION (3.0 s).
-    Title card: TITLE_DURATION (4.0 s). Outro: OUTRO_DURATION (6.0 s).
+    Minimum per-segment: MIN_SLIDE_DURATION (3.0 s).
     """
 ```
 
-### Private functions
+### Private helpers
 
 ```python
 def _exact_duration(
     seg:         SlideSegment,
-    unit_timing: list[dict],  # list of TimingEntry dicts for this unit
+    unit_timing: list[dict],   # list of TimingEntry dicts for this unit
 ) -> float:
     """
     Look up timing entries for lines_start and lines_end in unit_timing.
-    Return max(end_ms - start_ms, MIN_SLIDE_DURATION * 1000) / 1000.
-    If either entry is missing: fall back to _proportional_duration().
+    start_ms = unit_timing[seg.lines_start]["start_ms"]
+    end_ms   = unit_timing[seg.lines_end]["end_ms"]
+    Return max((end_ms - start_ms) / 1000.0, MIN_SLIDE_DURATION).
+    If either entry index is missing: fall back to _proportional_duration().
     """
 
 def _proportional_duration(
@@ -107,25 +113,31 @@ def _proportional_duration(
     """
 ```
 
-### Constants
+### Renamed private function (regression guard)
 
 ```python
-MIN_SLIDE_DURATION = 3.0    # seconds
-TITLE_DURATION     = 4.0    # seconds — fixed regardless of timing data
-OUTRO_DURATION     = 6.0    # seconds — fixed regardless of timing data
+def _compute_slide_timings_v2(
+    slides: list[Path],
+    script_lines: list[DialogueLine],
+    line_start_offsets: list[float],
+    visuals: list[VisualSpec],
+    unit_durations_s: list[float],
+) -> list[tuple[Path, float]]:
+    # identical to the current compute_slide_timings() body — no logic changes
+    ...
 ```
 
 ### File size
 
-`beat_timer.py` is currently ~120 lines. After this rewrite: approximately
-150 lines — well under 400.
+`beat_timer.py` is currently ~152 lines. After this change: approximately
+200 lines — under 400.
 
 ---
 
 ## Part B — Subtitle Writer (`tutor/visual/subtitle_writer.py`)
 
-Two functions gain an optional `timing_json` parameter. Default is `None`
-(preserves v2 behaviour exactly).
+Two public functions gain an optional `timing_json` parameter. Default is `None`,
+which preserves v2 behaviour exactly — no callers break.
 
 ### Updated signatures
 
@@ -137,8 +149,8 @@ def build_srt(
 ) -> str:
     """
     Build the SRT string for the full session.
-    If timing_json provided: use exact start_ms/end_ms per line for timestamps.
-    If timing_json is None: use WPM estimation (existing behaviour).
+    If timing_json provided: use exact start_ms/end_ms per line.
+    If timing_json is None: use WPM estimation (existing behaviour, unchanged).
     """
 
 def get_line_start_offsets(
@@ -149,7 +161,7 @@ def get_line_start_offsets(
     """
     Return session-global start offset in seconds for each line in all_lines.
     If timing_json provided: use exact offsets.
-    If timing_json is None: use WPM estimation (existing behaviour).
+    If timing_json is None: use WPM estimation (existing behaviour, unchanged).
     """
 ```
 
@@ -165,46 +177,37 @@ def _exact_line_offsets(
     Compute session-global start time for each line using timing_json.
 
     Algorithm:
-      1. Compute unit_start[u] = sum of unit_durations_s[0..u-1] for each unit u.
-         (Unit_start includes inter-unit silence gaps, consistent with how the
-          ffmpeg concat script works.)
-      2. For each line in all_lines, look up its entry in timing_json["units"][str(unit_num)].
+      1. Build unit_start[u] = sum of (unit_durations_s[u-1] + SILENCE_UNIT_MS/1000)
+         for units before u. Include the inter-unit silence in the cumulative cursor
+         so subtitle timestamps align with the concatenated video.
+      2. For each line in all_lines, look up timing_json["units"][str(unit_num)].
          session_start = unit_start[unit_num] + entry["start_ms"] / 1000
-      3. Lines with no entry (intro/outro) fall back to WPM estimation.
+      3. Lines not in timing_json (intro, outro) fall back to WPM estimation.
     """
 ```
 
-**Important:** inter-unit silence (`SILENCE_UNIT_MS`) is NOT included in
-`unit_durations_s` — that list contains only the MP3 play duration. The assembly
-adds silence between units. To keep subtitles aligned with the concatenated video,
-`_exact_line_offsets()` must add the same inter-unit gaps:
-
-```python
-unit_start = 0.0
-for unit_num in sorted_unit_nums:
-    # ... process unit lines ...
-    unit_start += unit_durations_s[unit_idx] + SILENCE_UNIT_MS / 1000
-```
+**Key:** `timing_json["units"]` keys are plain string integers (`"1"`, `"2"`, …)
+matching Day 13's output format.
 
 ### File size
 
-`subtitle_writer.py` is currently ~110 lines. After these additions: approximately
-140 lines — under 400.
+`subtitle_writer.py` is currently ~130 lines. After additions: approximately
+170 lines — under 400.
 
 ---
 
-## Part C — Pipeline integration (`tutor/visual/__init__.py`)
+## Part C — Pipeline orchestration (`tutor/visual/__init__.py`)
 
-`run_visual_pipeline()` is updated to run the v3 flow. The v3 flow always attempts
-to use segment-based slides; timing.json presence only affects timing precision.
+`run_visual_pipeline()` is updated to the v3 6-step flow. The function signature
+is unchanged so all existing callers (`/video` command, tests) continue to work.
 
-### New helper
+### New private helper
 
 ```python
 def _load_timing_json(audio_dir: Path) -> dict | None:
     """
-    Load tutorial.timing.json. Returns None if the file is absent,
-    unreadable, or has version != 1.
+    Load tutorial.timing.json. Returns None if absent, unreadable, or version != 1.
+    Logs a warning on parse failure; does not raise.
     """
     path = audio_dir / "tutorial.timing.json"
     if not path.exists():
@@ -221,19 +224,19 @@ def _load_timing_json(audio_dir: Path) -> dict | None:
 
 ```python
 def run_visual_pipeline(
-    session:   str,
-    audio_dir: Path,
-    video_dir: Path,
-    llm_fn:    Callable,
-    difficulty: str = "beginner",
-    no_cache:  bool = False,
+    session:    str,
+    audio_dir:  Path,
+    video_dir:  Path,
+    llm_fn:     Callable,
+    difficulty: str  = "beginner",
+    no_cache:   bool = False,
 ) -> Path:
-    from tutor.generation.visual_planner   import plan_visuals
-    from tutor.generation.segment_planner  import plan_segments
-    from tutor.visual.slide_compositor     import compose_all_v3
-    from tutor.visual.subtitle_writer      import build_srt, get_line_start_offsets
-    from tutor.visual.beat_timer           import compute_slide_timings_v3
-    from tutor.visual.video_assembler      import assemble_session
+    from tutor.generation.visual_planner  import plan_visuals
+    from tutor.generation.segment_planner import plan_segments
+    from tutor.visual.slide_renderer      import render_all_slides
+    from tutor.visual.subtitle_writer     import build_srt
+    from tutor.visual.beat_timer          import compute_slide_timings_v3
+    from tutor.visual.video_assembler     import assemble_session
 
     units_json     = audio_dir / "tutorial.units.json"
     doc_title      = _doc_title_from_units(units_json)
@@ -250,18 +253,18 @@ def run_visual_pipeline(
     print("  [2/6] Planning dialogue segments...")
     segments_by_unit = plan_segments(units_json, video_dir, llm_fn, no_cache)
 
-    print("  [3/6] Compositing slides...")
-    title_spec = visuals[0]    # slide_type == "title_card"
-    outro_spec  = visuals[-1]  # slide_type == "outro"
-    slide_paths = compose_all_v3(
+    print("  [3/6] Rendering slides...")
+    title_spec = next(v for v in visuals if v.slide_type == "title_card")
+    outro_spec  = next(v for v in visuals if v.slide_type == "outro")
+    slide_paths = render_all_slides(
         title_spec, outro_spec, segments_by_unit, slides_dir, session
     )
 
     print("  [4/6] Building SRT subtitles...")
-    timing_json  = _load_timing_json(audio_dir)
-    all_lines    = _load_all_lines(units_json)
-    srt_text     = build_srt(all_lines, unit_durations, timing_json)
-    srt_path     = video_dir / "subtitles.srt"
+    timing_json = _load_timing_json(audio_dir)
+    all_lines   = _load_all_lines(units_json)
+    srt_text    = build_srt(all_lines, unit_durations, timing_json)
+    srt_path    = video_dir / "subtitles.srt"
     srt_path.write_text(srt_text, encoding="utf-8")
 
     print("  [5/6] Computing slide timings...")
@@ -272,11 +275,11 @@ def run_visual_pipeline(
     )
 
     print("  [6/6] Assembling video...")
-    result = assemble_session(
+    result  = assemble_session(
         video_dir, audio_dir / "tutorial_units", slide_timings, unit_mp3s, srt_path
     )
     total_s = sum(dur for _, dur in slide_timings)
-    m, s = divmod(int(total_s), 60)
+    m, s    = divmod(int(total_s), 60)
     print(f"\n  ✓  {result}  ({m}:{s:02d})")
     return result
 ```
@@ -286,88 +289,75 @@ def run_visual_pipeline(
 ```python
 def _get_unit_mp3s(audio_dir: Path) -> list[Path]:
     """
-    Return unit MP3s matching ^unit_\d+$ (teaching units only, sorted).
-    Extracted from inline code for reuse and testability.
+    Return unit MP3s matching the pattern unit_NN.mp3 (teaching units, sorted).
+    Excludes unit_00_intro and unit_99_outro.
+    Extracted for reuse and testability.
     """
 ```
 
 ### File size
 
-`__init__.py` is currently 186 lines. After v3 integration: approximately
-230 lines — under 400.
-
----
-
-## Integration contract
-
-The six pipeline steps communicate only through files and in-memory return values:
-
-| Step | Produces | Consumed by |
-|---|---|---|
-| 1. `plan_visuals()` | `VisualSpec` list (memory) + `tutorial.visuals.json` | Step 3 |
-| 2. `plan_segments()` | `dict[int, list[SlideSegment]]` (memory) + `tutorial.segments.json` | Steps 3, 5 |
-| 3. `compose_all_v3()` | PNG paths (memory) + `slides/*.png` (disk) | Step 5 |
-| 4. `build_srt()` | `subtitles.srt` (disk) | Step 6 |
-| 5. `compute_slide_timings_v3()` | `list[(Path, float)]` (memory) | Step 6 |
-| 6. `assemble_session()` | `full_session.mp4` (disk) | user |
-
-No step reaches back into a previous step's output files. Each step's interface
-is its function signature.
+`__init__.py` is currently ~186 lines. After v3 integration: approximately
+240 lines — under 400.
 
 ---
 
 ## Backward compatibility matrix
 
-| Session state | Timing precision | Slide count | Behaviour |
+| Session state | Timing precision | Slide count | Outcome |
 |---|---|---|---|
-| v3 session (timing.json + segments.json) | Exact (±0 ms) | 8–15/unit | Full v3 |
+| v3 session (timing.json present) | Exact (±0 ms) | 8–15/unit | Full v3 |
 | v3 session (no timing.json) | Proportional (±5–10 s) | 8–15/unit | v3 slides, v2 timing |
-| Pre-v3 session (re-run `/video`) | Proportional (±5–10 s) | 8–15/unit | v3 slides generated fresh |
+| Pre-v3 session (re-run `/video`) | Proportional | 8–15/unit | New segments generated; v2 timing |
 
-In all cases `/video` completes successfully. The user only needs to re-run
-`/generate` to gain exact timing on an old session.
+In all cases `/video` completes successfully.
 
 ---
 
 ## Acceptance criteria
 
-- [ ] New session: `tutorial.timing.json` used by `/video`; subtitle timestamps exact
-- [ ] Pre-v3 session (no timing.json): `/video` completes without error
-- [ ] Slide durations within ±100ms of actual audio when timing.json present
-- [ ] SRT timestamps within ±100ms of audio when timing.json present
-- [ ] Step counter prints `[1/6]` through `[6/6]` to stdout
-- [ ] Final summary line prints path and duration `(M:SS)`
-- [ ] `beat_timer.py` stays under 400 lines; v2 `compute_slide_timings()` callable
-- [ ] `subtitle_writer.py` stays under 400 lines; v2 callers without timing_json unchanged
+- [ ] Step counter prints `[1/6]` through `[6/6]` to stdout in order
+- [ ] Final summary line prints path and duration `(M:SS)` format
+- [ ] New session with timing.json: subtitle timestamps within ±100 ms of audio
+- [ ] Pre-v3 session (no timing.json): `/video` completes without error or exception
+- [ ] `_load_timing_json()` returns `None` for absent file, corrupt JSON, and `version != 1`
+- [ ] `beat_timer.py` stays under 400 lines; `_compute_slide_timings_v2()` callable (regression)
+- [ ] `subtitle_writer.py` stays under 400 lines; v2 callers without `timing_json` unchanged
 - [ ] `__init__.py` stays under 400 lines
-- [ ] No step imports from another step's module (only via function arguments)
+- [ ] `timing_json["units"]` keys read as plain string integers (`"1"`, `"2"`, …)
+- [ ] Inter-unit silence (`SILENCE_UNIT_MS`) included in cumulative offset for subtitles
+
+---
 
 ## Tests — `tutor/tests/visual/test_beat_timer.py`
 
-Extend existing test file — do not replace it.
+Extend the existing test file — do not replace it.
 
-- `test_exact_duration_from_timing_json` — segment spanning 3240ms → 3.24s
-- `test_proportional_fallback_when_timing_absent`
-- `test_min_slide_duration_enforced` — 0.5s segment → clamped to 3.0s
+- `test_exact_duration_from_timing_json` — segment spanning 3240 ms → 3.24 s
+- `test_exact_duration_uses_lines_start_and_end` — segment covering lines 2–4 reads correct entries
+- `test_proportional_fallback_when_timing_absent` — `timing_json=None` → proportional result
+- `test_min_slide_duration_enforced` — 0.5 s segment → clamped to 3.0 s
 - `test_title_duration_is_4_seconds`
 - `test_outro_duration_is_6_seconds`
 - `test_all_segments_present_in_output` — output count = 2 + sum of segment counts
-- `test_v2_compute_slide_timings_still_callable` — regression guard
+- `test_v2_function_still_callable` — call `_compute_slide_timings_v2()` with stub args; assert no exception
 
 ## Tests — `tutor/tests/visual/test_subtitle_writer.py`
 
-Extend existing test file.
+Extend the existing test file.
 
-- `test_exact_offsets_from_timing_json` — line with known start_ms gets correct timestamp
-- `test_fallback_offsets_when_timing_absent` — same result as v2 when timing_json=None
-- `test_unit_start_offsets_cumulative` — unit 2 starts at unit_1_duration + SILENCE_UNIT_MS/1000
-- `test_intro_lines_not_in_timing_json_get_estimated_offset`
+- `test_exact_offsets_from_timing_json` — line with known `start_ms` gets correct timestamp
+- `test_fallback_when_timing_absent` — `timing_json=None` → same result as v2
+- `test_inter_unit_silence_included` — unit 2 start = unit_1_duration + SILENCE_UNIT_MS/1000
+- `test_intro_lines_fall_back_to_estimation` — lines with `unit_number=0` not in timing_json get estimated offset
 
 ## Tests — `tutor/tests/visual/test_pipeline_integration.py`
 
-New test file.
+New test file. Uses mocked LLM, stub Playwright (or `@pytest.mark.slow`), stub ffmpeg.
 
-- `test_run_visual_pipeline_v3_end_to_end` — mocked LLM + real Pillow + stub ffmpeg; asserts mp4 path returned
-- `test_run_visual_pipeline_no_timing_json` — timing.json absent; pipeline completes
-- `test_six_progress_steps_printed` — capture stdout; assert "[1/6]" through "[6/6]"
-- `test_output_in_video_dir` — result path is under `video/<session>/`
+- `test_run_visual_pipeline_six_steps_printed` — capture stdout; assert `[1/6]` through `[6/6]`
+- `test_run_visual_pipeline_no_timing_json` — timing.json absent; pipeline completes without error
+- `test_load_timing_json_returns_none_for_absent_file`
+- `test_load_timing_json_returns_none_for_wrong_version` — `version: 2` → `None`
+- `test_load_timing_json_returns_none_for_corrupt_json`
+- `test_output_path_is_under_video_dir` — result path starts with `video/<session>/` `@slow`

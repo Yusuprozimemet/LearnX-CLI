@@ -115,7 +115,7 @@ v3 specs are written and waiting. None have been started yet.
 |-----|------|--------|-----------------|
 | 13  | `specs/v3/day13.md` — Exact timing capture from audio builder | **Not started** | `sandbox/day13` |
 | 14  | `specs/v3/day14.md` — Dialogue-aware visual segment planner | Not started | `sandbox/day14` |
-| 15  | `specs/v3/day15.md` — Slide renderers for each visual type | Not started | `sandbox/day15` |
+| 15  | `specs/v3/day15.md` — HTML slide renderer (Playwright + Jinja2) | Not started | `sandbox/day15` |
 | 16  | `specs/v3/day16.md` — Full pipeline integration | Not started | `sandbox/day16` |
 
 **Day 13 is the correct starting point.** Days 14–16 depend on it.
@@ -123,9 +123,18 @@ v3 specs are written and waiting. None have been started yet.
 Day 13 key facts:
 - Modify `_concat_with_silence()` in `tutor/audio/audio_builder.py` to capture timing
 - Add `TimingEntry` dataclass to `tutor/models.py`
-- Write `tutorial.timing.json` from `_assemble()`
-- Create `tutor/tests/audio/test_audio_builder.py` with 7 new tests
+- Write `tutorial.timing.json` from `_assemble()`; keys are plain string integers (`"1"`, `"2"`, …)
+- Extend `tutor/tests/audio/test_audio_builder.py` with 7 new tests
 - `build()` public API must not change
+
+Day 15 key facts (different from old plan — read carefully):
+- Replaces Pillow with Playwright + Jinja2 HTML templates
+- Deletes `slide_compositor.py`, `slide_draw.py`, `slide_theme.py`, `diagram_renderer.py`
+  and their test files
+- New file: `tutor/visual/slide_renderer.py`
+- New directories: `tutor/visual/templates/` and `tutor/assets/html/`
+- Adds `playwright>=1.44` and `jinja2>=3.1` to `pyproject.toml`
+- Requires one-time `playwright install chromium` (add to CI)
 
 ---
 
