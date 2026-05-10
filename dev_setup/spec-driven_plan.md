@@ -115,6 +115,35 @@ test_timing_offsets_no_gaps_no_overlaps
 
 ---
 
+## Fix File Template
+
+Every file in `fixes/` follows this structure. The **Spec gap** section is the most
+important for future specs — it records what the spec failed to make explicit.
+
+```markdown
+# fixNNN — short description
+
+**Date:** YYYY-MM-DD
+
+## Symptom
+What the user or CI observed. Paste the actual error message.
+
+## Spec gap
+What the spec failed to state. Complete this sentence:
+"Any future spec that does X must explicitly say Y."
+
+## Root cause
+The technical reason the symptom occurred.
+
+## Files changed
+List of files modified.
+
+## What changed
+What was done and why it fixes the root cause.
+```
+
+---
+
 ## What the Fix Files Teach You About Specs
 
 The `fixes/` folder contains 15 post-mortems. Each one is a case where the

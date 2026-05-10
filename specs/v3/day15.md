@@ -18,6 +18,20 @@ separation of concerns:
 
 ---
 
+## Done (merge gate)
+
+```powershell
+py -m pytest tutor/tests/visual/test_slide_compositor_v3.py -v   # scoped — all green
+py -m pytest                                                      # full suite — 0 failures
+py -m ruff check tutor/                                           # 0 errors
+py -m ruff format --check tutor/                                  # 0 formatting issues
+```
+
+Report: list each acceptance criterion below with pass/fail. Paste gate output.
+Stop: do not merge to main — wait for human review.
+
+---
+
 ## Data boundary
 
 ```
