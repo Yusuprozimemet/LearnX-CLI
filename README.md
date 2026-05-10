@@ -10,13 +10,17 @@ Turn any Markdown document into an interactive audio tutorial and a fully-produc
   <img src="learnX.png" alt="LearnX CLI" />
 </p>
 
+> **v3 status:** The conversation-driven slide pipeline is implemented and runs end-to-end. Known issues (audio playback in some players, timing fine-tuning) are tracked in [`next_step.md`](next_step.md) and will be fixed in the next round.
+
 ---
 
 ## What it does
 
 ```
 .md file → LLM curriculum → TTS audio → interactive player + Q&A
-                                       → MP4 video (slides + subtitles)
+                          ↓ timing.json
+                                       → LLM segment plan → HTML slides (Playwright)
+                                       → exact subtitle sync → MP4 video
 ```
 
 **Audio pipeline (v1):**
@@ -25,15 +29,16 @@ Turn any Markdown document into an interactive audio tutorial and a fully-produc
 2. **Summarises** each chunk with an LLM and plans a teaching curriculum
 3. **Generates** a tutor–student (or dual-tutor) dialogue script
 4. **Renders** each unit to speech via Microsoft Azure Neural TTS (no TTS API key needed)
-5. **Plays back** through an interactive shell with pause, skip, replay, and a live Q&A engine
+5. **Captures** exact per-line timing (`tutorial.timing.json`) during audio assembly
+6. **Plays back** through an interactive shell with pause, skip, replay, and a live Q&A engine
 
-**Video pipeline (v2):**
+**Video pipeline (v3):**
 
-6. **Plans** slide visuals — hook question, concept diagram spec, memory hook — per unit via LLM
-7. **Renders** diagrams to PNG using Graphviz
-8. **Composites** branded slides (1920×1080) using Pillow with a dark theme
-9. **Syncs** slides to audio via dialogue beat detection (first ALEX line → hook; first MAYA line → concept; last ALEX line → memory)
-10. **Assembles** the final MP4 with ffmpeg — unit videos concatenated, SRT subtitles embedded
+7. **Plans** dialogue segments — LLM assigns each line range to one of 10 visual types (key insight, analogy, comparison, code example, diagram, definition, question prompt, memory hook, hook question, decision guide)
+8. **Renders** HTML slides at 1920×1080 via headless Chromium (Playwright + Jinja2 templates, dark theme CSS)
+9. **Syncs** each slide to its exact audio window using `tutorial.timing.json` — no beat estimation
+10. **Writes** SRT subtitles with millisecond-accurate timestamps from timing data
+11. **Assembles** the final MP4 with ffmpeg — per-unit videos concatenated, subtitles embedded
 
 ---
 
@@ -72,17 +77,20 @@ Each feature day had a written specification reviewed and approved before implem
 | [`specs/v2/day11.md`](specs/v2/day11.md) | Subtitle writer + video assembler — SRT + ffmpeg |
 | [`specs/v2/day12.md`](specs/v2/day12.md) | Shell integration — `/video`, `/vsessions`, polish |
 
-Post-implementation fixes are documented in [`fixes/`](fixes/) (fix001–fix015).  
+Post-implementation fixes are documented in [`fixes/`](fixes/) (fix001–fix017).  
 Architecture plans: [`plan/v0_plan.md`](plan/v0_plan.md) · [`plan/v1_plan.md`](plan/v1_plan.md) · [`plan/v2_plan.md`](plan/v2_plan.md) · [`plan/v3_plan.md`](plan/v3_plan.md).
 
-### v3 — Conversation-driven slides (planned)
+### v3 — Conversation-driven slides (implemented — fixes in progress)
 
-| Spec | Feature |
-|---|---|
-| [`specs/v3/day13.md`](specs/v3/day13.md) | Exact timing capture — `tutorial.timing.json` written during audio assembly |
-| [`specs/v3/day14.md`](specs/v3/day14.md) | Dialogue-aware segment planner — new `segment_planner.py`; 10 visual types including `diagram` |
-| [`specs/v3/day15.md`](specs/v3/day15.md) | HTML slide renderer — Playwright + Jinja2 replaces Pillow; Mermaid diagrams; highlight.js code |
-| [`specs/v3/day16.md`](specs/v3/day16.md) | Pipeline integration — exact timing, subtitle sync, backward compat |
+| Spec | Feature | Status |
+|---|---|---|
+| [`specs/v3/day13.md`](specs/v3/day13.md) | Exact timing capture — `tutorial.timing.json` written during audio assembly | ✅ merged |
+| [`specs/v3/day14.md`](specs/v3/day14.md) | Dialogue-aware segment planner — `segment_planner.py`; 10 visual types | ✅ merged |
+| [`specs/v3/day15.md`](specs/v3/day15.md) | HTML slide renderer — Playwright + Jinja2 replaces Pillow; Mermaid + highlight.js | ✅ merged |
+| [`specs/v3/day16.md`](specs/v3/day16.md) | Pipeline integration — exact timing, subtitle sync, 6-step `run_visual_pipeline()` | ✅ merged |
+| [`specs/v3/day16_extra.md`](specs/v3/day16_extra.md) | Bug fixes — CSS loading, system fonts, template None guards, timing gap accounting | 🔄 pending merge |
+
+**Known issues (v3):** Audio not audible in some players (AAC stream confirmed present — likely codec/player issue); slide timing inflation may over-count inter-line silence. See [`next_step.md`](next_step.md) for full diagnosis and fix plan.
 
 ---
 
@@ -99,8 +107,13 @@ echo "GROQ_API_KEY=gsk_..." > tutor/.env
 python -m tutor
 ```
 
-**Requires:** Python 3.11+, [ffmpeg](https://ffmpeg.org/download.html) in PATH.  
+**Requires:** Python 3.12+, [ffmpeg](https://ffmpeg.org/download.html) in PATH, Chromium for slide rendering.  
 **API key:** Free at [console.groq.com](https://console.groq.com).
+
+```bash
+# One-time: install Chromium for Playwright (needed for /video)
+playwright install chromium
+```
 
 ---
 
@@ -330,7 +343,8 @@ Press `/ask` at any point during playback:
 | `tutorial.mp3` | Full concatenated audio |
 | `tutorial_units/` | Per-unit `.mp3` files for the player |
 | `tutorial.script.txt` | Full dialogue script |
-| `tutorial.units.json` | Teaching unit metadata (lines, concepts, key points) |
+| `tutorial.units.json` | Teaching unit metadata (concepts, key points) |
+| `tutorial.timing.json` | Per-line `start_ms` / `end_ms` captured during TTS assembly (v3) |
 | `tutorial.chunks.json` | Source chunks used for Q&A context |
 | `tutorial.meta.json` | Source file path (used by video pipeline for title) |
 | `tutorial.session.json` | Q&A exchanges from the current session |
@@ -339,10 +353,11 @@ Press `/ask` at any point during playback:
 
 | File | Contents |
 |---|---|
-| `full_session.mp4` | Final assembled video with subtitles |
-| `slides/` | Composited slide PNGs (title, hook, concept, memory, outro per unit) |
-| `subtitles.srt` | SRT subtitle file |
-| `tutorial.visuals.json` | Cached visual spec (slide plan from LLM) |
+| `full_session.mp4` | Final assembled video with embedded subtitles |
+| `slides/` | HTML-rendered slide PNGs — one per dialogue segment (v3) |
+| `subtitles.srt` | SRT subtitle file with millisecond-accurate timestamps |
+| `tutorial.visuals.json` | Cached visual spec (title card + outro plan from LLM) |
+| `tutorial.segments.json` | Cached dialogue segment plan — maps line ranges to visual types (v3) |
 
 ---
 
@@ -352,7 +367,7 @@ Press `/ask` at any point during playback:
 python -m pytest
 ```
 
-235 tests across ingestion, generation, audio, player, visual, and CLI modules. No API keys required — all LLM calls are mocked.
+219 tests across ingestion, generation, audio, player, visual, and CLI modules. No API keys required — all LLM calls are mocked.
 
 ---
 
@@ -374,7 +389,8 @@ tutor/
     curriculum.py       # Teaching unit planning
     dialogue.py         # Script generation + caching
     assembler.py        # Intro/outro + line assembly
-    visual_planner.py   # Slide plan generation (v2)
+    visual_planner.py   # Title card + outro plan (v3)
+    segment_planner.py  # Dialogue segment → visual type mapping (v3)
   ingestion/            # Document parsing
     chunker.py          # Strategy A/B/C chunking
     summarizer.py       # Per-chunk LLM summarisation
@@ -383,36 +399,36 @@ tutor/
   qa/                   # Q&A engine
     qa.py
   audio/                # TTS rendering
-    audio_builder.py
+    audio_builder.py    # Assembly + timing.json capture (v3)
     tts_renderer.py
     sanitizer.py        # Code-to-speech substitutions
-  visual/               # Video pipeline (v2)
-    __init__.py         # run_visual_pipeline() entry point
-    slide_compositor.py # Pillow slide layout (1920×1080)
-    slide_theme.py      # Colours, fonts, constants
-    slide_draw.py       # Drawing primitives
-    diagram_renderer.py # Graphviz PNG rendering
-    beat_timer.py       # Slide timing from dialogue beats
-    subtitle_writer.py  # SRT generation
-    video_assembler.py  # ffmpeg pipeline
+  visual/               # Video pipeline (v3)
+    __init__.py         # run_visual_pipeline() — 6-step entry point
+    slide_renderer.py   # Playwright + Jinja2 HTML → PNG (v3, replaces Pillow)
+    templates/          # Jinja2 HTML templates — 11 visual types + title/outro
+    beat_timer.py       # Slide timing from timing.json (v3 exact) or beats (v2)
+    subtitle_writer.py  # SRT generation with exact ms timestamps (v3)
+    video_assembler.py  # ffmpeg pipeline — per-unit MP4s → full_session.mp4
   infra/
     llm.py              # LLM client + config loader
-  assets/               # Fonts and logo resources
+  assets/
+    html/               # CSS + JS stubs (slide_base.css, highlight, mermaid)
   config.py             # ffmpeg detection and env validation
-  constants.py          # Tuning knobs (WPM, voices, limits)
+  constants.py          # Tuning knobs (WPM, silence gaps, voices, limits)
   exceptions.py         # TutorError hierarchy
   inspector.py          # /inspect report printer
-  models.py             # Dataclasses (Chunk, TeachingUnit, VisualSpec …)
+  models.py             # Dataclasses (Chunk, TeachingUnit, SlideSegment, VisualSpec …)
   llm_config.toml       # Model names, token budgets, call settings
-  prompts/              # Prompt templates (curriculum, dialogue, qa, visual)
-  tests/                # 220 tests — no API keys required
+  prompts/              # Prompt templates (curriculum, dialogue, qa, visual, segments)
+  tests/                # 219 tests — no API keys required
 specs/
   v0/                   # Engineering foundations specs (Days 0–3)
   v1/                   # Audio pipeline specs (Days 1–7)
   v2/                   # Video pipeline specs (Days 8–12)
-  v3/                   # Conversation-driven slides specs (Days 13–16, planned)
+  v3/                   # Conversation-driven slides specs (Days 13–16 + extra)
 plan/                   # Architecture planning documents (v0–v3)
-fixes/                  # Post-implementation fix notes (fix001–fix015)
+fixes/                  # Post-implementation fix notes (fix001–fix017)
+next_step.md            # Current status, known issues, and what to do next
 audio/                  # Generated audio sessions (gitignored)
 video/                  # Generated video sessions (gitignored)
 ```
