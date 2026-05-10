@@ -13,12 +13,15 @@ MAX_SUBTITLE_CHARS = 60
 def build_srt(
     all_lines: list[DialogueLine],
     unit_durations_s: list[float],
+    timing_json: dict | None = None,
 ) -> str:
     """
     Build a complete SRT string for the session.
-    all_lines: flat list in play order; unit_durations_s: actual MP3 duration per unit.
+    If timing_json provided: use exact start_ms/end_ms per line.
+    If timing_json is None: use WPM estimation (existing behaviour, unchanged).
     """
-    offsets, durations = _compute_timing(all_lines, unit_durations_s)
+    offsets = get_line_start_offsets(all_lines, unit_durations_s, timing_json)
+    _, durations = _compute_timing(all_lines, unit_durations_s)
     entries: list[str] = []
     for idx, (line, start, dur) in enumerate(
         zip(all_lines, offsets, durations, strict=False), start=1
@@ -32,13 +35,68 @@ def build_srt(
 def get_line_start_offsets(
     all_lines: list[DialogueLine],
     unit_durations_s: list[float],
+    timing_json: dict | None = None,
 ) -> list[float]:
-    """Return the start time (seconds) of each line. Shares logic with build_srt."""
+    """
+    Return the start time (seconds) of each line.
+    If timing_json provided: use exact offsets.
+    If timing_json is None: use WPM estimation (existing behaviour, unchanged).
+    """
+    if timing_json is not None:
+        return _exact_line_offsets(all_lines, unit_durations_s, timing_json)
     offsets, _ = _compute_timing(all_lines, unit_durations_s)
     return offsets
 
 
 # ── Internals ────────────────────────────────────────────────────────────────
+
+
+def _exact_line_offsets(
+    all_lines: list[DialogueLine],
+    unit_durations_s: list[float],
+    timing_json: dict,
+) -> list[float]:
+    """
+    Compute session-global start time for each line using timing_json.
+
+    unit_start[u] accumulates unit durations + inter-unit silence so
+    subtitle timestamps align with the concatenated video.
+    Lines not in timing_json (intro/outro) fall back to WPM estimation.
+    """
+    # Build cumulative unit start offsets
+    unit_start: dict[int, float] = {}
+    cursor = 0.0
+    for u_idx, dur in enumerate(unit_durations_s, start=1):
+        unit_start[u_idx] = cursor
+        cursor += dur + SILENCE_UNIT_MS / 1000
+
+    units_timing: dict[str, list] = timing_json.get("units", {})
+    wpm_offsets, _ = _compute_timing(all_lines, unit_durations_s)
+
+    # Track within-unit line index per unit
+    unit_line_idx: dict[int, int] = {}
+    offsets: list[float] = []
+
+    for i, ln in enumerate(all_lines):
+        u = ln.unit_number
+        key = str(u)
+        unit_entries = units_timing.get(key)
+
+        if unit_entries is None:
+            offsets.append(wpm_offsets[i])
+            continue
+
+        within_idx = unit_line_idx.get(u, 0)
+        unit_line_idx[u] = within_idx + 1
+
+        if within_idx >= len(unit_entries):
+            offsets.append(wpm_offsets[i])
+            continue
+
+        entry = unit_entries[within_idx]
+        offsets.append(unit_start.get(u, 0.0) + entry["start_ms"] / 1000)
+
+    return offsets
 
 
 def _compute_timing(

@@ -5,7 +5,7 @@ No ffmpeg, no Pillow, no LLM here.
 
 from pathlib import Path
 
-from tutor.models import DialogueLine, VisualSpec
+from tutor.models import DialogueLine, SlideSegment, VisualSpec
 
 MIN_SLIDE_DURATION = 3.0  # seconds
 MAX_HOOK_DURATION = 30.0  # cap hook slide — ALEX can monologue for a long time before MAYA
@@ -13,7 +13,71 @@ TITLE_CARD_DURATION = 4.0
 OUTRO_CARD_DURATION = 6.0
 
 
-def compute_slide_timings(
+def compute_slide_timings_v3(
+    title_path: Path,
+    outro_path: Path,
+    segments_by_unit: dict[int, list[SlideSegment]],
+    timing_json: dict | None,
+    unit_durations_s: list[float],
+) -> list[tuple[Path, float]]:
+    """
+    Return [(png_path, duration_seconds), ...] in video order, ready for the
+    ffmpeg concat script. Prepends title card (4.0 s) and appends outro (6.0 s).
+
+    Duration source per segment:
+      timing_json present  → _exact_duration()
+      timing_json absent   → _proportional_duration()
+
+    Minimum per-segment: MIN_SLIDE_DURATION (3.0 s).
+    """
+    result: list[tuple[Path, float]] = [(title_path, TITLE_CARD_DURATION)]
+
+    units_timing = timing_json.get("units", {}) if timing_json else {}
+
+    for unit_num in sorted(segments_by_unit.keys()):
+        segs = segments_by_unit[unit_num]
+        unit_dur = unit_durations_s[unit_num - 1] if unit_num - 1 < len(unit_durations_s) else 30.0
+        total_lines = max(s.lines_end for s in segs) + 1 if segs else 1
+        unit_timing: list[dict] = units_timing.get(str(unit_num), [])
+
+        for seg in segs:
+            path = Path(seg.png_path)
+            if timing_json and unit_timing:
+                dur = _exact_duration(seg, unit_timing)
+            else:
+                dur = _proportional_duration(seg, unit_dur, total_lines)
+            result.append((path, dur))
+
+    result.append((outro_path, OUTRO_CARD_DURATION))
+    return result
+
+
+def _exact_duration(seg: SlideSegment, unit_timing: list[dict]) -> float:
+    """
+    Look up timing entries for lines_start and lines_end in unit_timing.
+    Falls back to proportional if either index is out of range.
+    """
+    try:
+        start_ms = unit_timing[seg.lines_start]["start_ms"]
+        end_ms = unit_timing[seg.lines_end]["end_ms"]
+        return max((end_ms - start_ms) / 1000.0, MIN_SLIDE_DURATION)
+    except (IndexError, KeyError, TypeError):
+        total_lines = len(unit_timing) if unit_timing else 1
+        return _proportional_duration(seg, 30.0, total_lines)
+
+
+def _proportional_duration(seg: SlideSegment, unit_duration_s: float, total_lines: int) -> float:
+    """
+    Segment covers (lines_end - lines_start + 1) / total_lines of unit duration.
+    Return max(computed, MIN_SLIDE_DURATION).
+    """
+    lines_covered = seg.lines_end - seg.lines_start + 1
+    denom = max(total_lines, 1)
+    computed = lines_covered / denom * unit_duration_s
+    return max(computed, MIN_SLIDE_DURATION)
+
+
+def _compute_slide_timings_v2(
     slides: list[Path],
     script_lines: list[DialogueLine],
     line_start_offsets: list[float],
@@ -75,6 +139,10 @@ def compute_slide_timings(
         result.append((outro_slide, OUTRO_CARD_DURATION))
 
     return result
+
+
+# Backward-compat alias — callers that used compute_slide_timings still work
+compute_slide_timings = _compute_slide_timings_v2
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
