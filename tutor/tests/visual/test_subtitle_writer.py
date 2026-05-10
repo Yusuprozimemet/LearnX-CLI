@@ -1,5 +1,7 @@
 import re
 
+import pytest
+
 from tutor.models import DialogueLine
 from tutor.visual.subtitle_writer import (
     _format_timestamp,
@@ -110,3 +112,54 @@ def test_get_line_start_offsets_matches_srt_timestamps():
     # First line always starts at 0.0
     assert offsets[0] == 0.0
     assert ts_str == "00:00:00,000"
+
+
+# ── Exact timing tests ────────────────────────────────────────────────────────
+
+
+def _make_timing_json(unit_num: int, entries: list[dict]) -> dict:
+    return {"version": 1, "units": {str(unit_num): entries}}
+
+
+def test_exact_offsets_from_timing_json() -> None:
+
+    lines = [_line("ALEX", "First line", 1)]
+    timing_json = _make_timing_json(1, [{"line_index": 0, "start_ms": 2000, "end_ms": 4000}])
+    offsets = get_line_start_offsets(lines, [30.0], timing_json)
+    # unit_start[1] = 0 + 2000ms/1000 = 2.0 s
+    assert offsets[0] == pytest.approx(2.0, abs=0.01)
+
+
+def test_fallback_when_timing_absent() -> None:
+    lines = [_line("ALEX", "Hello world", 1), _line("MAYA", "Great", 1)]
+    offsets_v2 = get_line_start_offsets(lines, [30.0])
+    offsets_v3 = get_line_start_offsets(lines, [30.0], None)
+    assert offsets_v2 == offsets_v3
+
+
+def test_inter_unit_silence_included() -> None:
+    from tutor.constants import SILENCE_UNIT_MS  # noqa: PLC0415
+
+    unit1_dur = 20.0
+    lines = [_line("ALEX", "Unit one", 1), _line("ALEX", "Unit two", 2)]
+    timing_json = {
+        "version": 1,
+        "units": {
+            "1": [{"line_index": 0, "start_ms": 0, "end_ms": 1000}],
+            "2": [{"line_index": 0, "start_ms": 0, "end_ms": 1000}],
+        },
+    }
+    offsets = get_line_start_offsets(lines, [unit1_dur, 20.0], timing_json)
+    # unit_start[2] = unit1_dur + SILENCE_UNIT_MS/1000
+    expected = unit1_dur + SILENCE_UNIT_MS / 1000
+    assert offsets[1] == pytest.approx(expected, abs=0.01)
+
+
+def test_intro_lines_fall_back_to_estimation() -> None:
+    # Lines with unit_number=0 are not in timing_json → WPM estimation
+    lines = [_line("ALEX", "Intro text here", 0), _line("ALEX", "Unit one content", 1)]
+    timing_json = _make_timing_json(1, [{"line_index": 0, "start_ms": 5000, "end_ms": 6000}])
+    offsets_exact = get_line_start_offsets(lines, [30.0], timing_json)
+    offsets_wpm = get_line_start_offsets(lines, [30.0], None)
+    # Intro line (unit 0) uses WPM: offset should equal the WPM result
+    assert offsets_exact[0] == pytest.approx(offsets_wpm[0], abs=0.01)

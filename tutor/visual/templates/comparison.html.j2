@@ -4,8 +4,8 @@
   <table class="comparison-table">
     <thead>
       <tr>
-        <th class="th-left">{{ seg.left | e }}</th>
-        <th class="th-right">{{ seg.right | e }}</th>
+        <th class="th-left">{{ seg.left | default('') | e }}</th>
+        <th class="th-right">{{ seg.right | default('') | e }}</th>
       </tr>
     </thead>
     <tbody>

@@ -1,6 +1,10 @@
 {% extends "_base.html.j2" %}
 {% block content %}
 <div class="diagram-slide">
+  {% if seg.mermaid %}
   <div class="mermaid">{{ seg.mermaid | e }}</div>
+  {% else %}
+  <p style="color:var(--text-sec);font-size:36px;">{{ seg.title | e }}</p>
+  {% endif %}
 </div>
 {% endblock %}

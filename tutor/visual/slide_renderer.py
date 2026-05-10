@@ -1,3 +1,5 @@
+import os
+import tempfile
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
@@ -93,21 +95,34 @@ def _screenshot(
     wait_mermaid: bool,
     wait_hljs: bool,
 ) -> None:
-    page.set_content(html, wait_until="domcontentloaded")  # type: ignore[union-attr]
-    if wait_mermaid:
+    # Write to a temp file so the page gets a file:// origin and can load
+    # CSS/JS/font assets via file:// URLs (set_content() gives null origin,
+    # which Chromium blocks).
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False, encoding="utf-8") as f:
+        f.write(html)
+        tmp_path = f.name
+    try:
+        url = "file:///" + tmp_path.replace(os.sep, "/")
+        page.goto(url, wait_until="domcontentloaded")  # type: ignore[union-attr]
+        if wait_mermaid:
+            try:
+                page.wait_for_function(  # type: ignore[union-attr]
+                    "() => document.querySelector('.mermaid svg') !== null",
+                    timeout=10_000,
+                )
+            except Exception:
+                pass
+        if wait_hljs:
+            try:
+                page.wait_for_function(  # type: ignore[union-attr]
+                    "() => document.querySelector('pre code.hljs') !== null",
+                    timeout=5_000,
+                )
+            except Exception:
+                pass
+        page.screenshot(path=str(output), full_page=False)  # type: ignore[union-attr]
+    finally:
         try:
-            page.wait_for_function(  # type: ignore[union-attr]
-                "() => document.querySelector('.mermaid svg') !== null",
-                timeout=10_000,
-            )
-        except Exception:
+            os.unlink(tmp_path)
+        except OSError:
             pass
-    if wait_hljs:
-        try:
-            page.wait_for_function(  # type: ignore[union-attr]
-                "() => document.querySelector('pre code.hljs') !== null",
-                timeout=5_000,
-            )
-        except Exception:
-            pass
-    page.screenshot(path=str(output), full_page=False)  # type: ignore[union-attr]
