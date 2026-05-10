@@ -82,6 +82,15 @@ class SessionLog:
 
 
 @dataclass
+class TimingEntry:
+    line_index: int  # 0-based within the unit
+    speaker: str  # "ALEX" | "MAYA" | "SAM"
+    text: str  # dialogue line text — for cross-referencing only
+    start_ms: int  # offset from unit MP3 start, in milliseconds
+    end_ms: int  # exclusive end; end_ms - start_ms == len(audio) in ms
+
+
+@dataclass
 class VisualSpec:
     unit_index: int
     slide_type: str  # "title_card" | "unit" | "outro"

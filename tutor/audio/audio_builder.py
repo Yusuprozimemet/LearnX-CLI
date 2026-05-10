@@ -1,6 +1,8 @@
 import asyncio
+import json
 import logging
 import shutil
+from dataclasses import asdict
 from pathlib import Path
 
 from pydub import AudioSegment
@@ -13,7 +15,7 @@ from tutor.constants import (
     SILENCE_UNIT_MS,
     TTS_SEMAPHORE_LIMIT,
 )
-from tutor.models import DialogueLine, RenderedSegment
+from tutor.models import DialogueLine, RenderedSegment, TimingEntry
 
 log = logging.getLogger(__name__)
 
@@ -58,10 +60,16 @@ def _assemble(segments: list[RenderedSegment], out_path: str, units_dir: str) ->
     # Sort: intro (0) first, then units (1..N), outro (-1) last
     sorted_keys = sorted(unit_groups.keys(), key=lambda x: 999 if x == -1 else x)
 
+    unit_timing: dict[str, list] = {}
     unit_audio: list[AudioSegment] = []
+
     for unit_num in sorted_keys:
         group = unit_groups[unit_num]
-        combined = _concat_with_silence(group)
+        is_teaching_unit = unit_num >= 1
+        combined, entries = _concat_with_silence(group, capture_timing=is_teaching_unit)
+
+        if is_teaching_unit and entries:
+            unit_timing[str(unit_num)] = [asdict(e) for e in entries]
 
         if unit_num == 0:
             unit_label = "unit_00_intro"
@@ -78,27 +86,55 @@ def _assemble(segments: list[RenderedSegment], out_path: str, units_dir: str) ->
         if unit_num != -1:
             unit_audio.append(AudioSegment.silent(duration=SILENCE_UNIT_MS))
 
+    timing_path = Path(out_path).parent / "tutorial.timing.json"
+    timing_path.write_text(
+        json.dumps({"version": 1, "units": unit_timing}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    log.info("Timing file written: %s (%d units)", timing_path, len(unit_timing))
+
     full_audio = sum(unit_audio, AudioSegment.empty())
     full_audio.export(out_path, format="mp3")
     log.info("Saved full audio: %s (%d segments)", out_path, len(segments))
 
 
-def _concat_with_silence(segments: list[RenderedSegment]) -> AudioSegment:
+def _concat_with_silence(
+    segments: list[RenderedSegment],
+    capture_timing: bool = False,
+) -> tuple[AudioSegment, list[TimingEntry]]:
     result = AudioSegment.empty()
+    entries: list[TimingEntry] = []
+    cursor_ms = 0
     prev_speaker: str | None = None
 
-    for seg in segments:
+    for idx, seg in enumerate(segments):
         audio = AudioSegment.from_mp3(seg.audio_path)
+
         if prev_speaker is None:
-            pass
+            gap = 0
         elif prev_speaker == seg.line.speaker:
-            result += AudioSegment.silent(duration=SILENCE_BREATH_MS)
+            gap = SILENCE_BREATH_MS
         else:
-            result += AudioSegment.silent(duration=SILENCE_TURN_MS)
+            gap = SILENCE_TURN_MS
+
+        if gap:
+            result += AudioSegment.silent(duration=gap)
+            cursor_ms += gap
+
+        if capture_timing:
+            entries.append(TimingEntry(
+                line_index=idx,
+                speaker=seg.line.speaker,
+                text=seg.line.text,
+                start_ms=cursor_ms,
+                end_ms=cursor_ms + len(audio),
+            ))
+
         result += audio
+        cursor_ms += len(audio)
         prev_speaker = seg.line.speaker
 
-    return result
+    return result, entries
 
 
 def _cleanup_tmp(tmp_dir: str) -> None:

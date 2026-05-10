@@ -3,9 +3,9 @@ week1/
 week2/
 systemDesign/
 
-# Generated output directories
-audio/
-video/
+# Generated output directories (root-level only — not tutor/audio/ source)
+/audio/
+/video/
 
 # Generated audio output
 *.mp3
