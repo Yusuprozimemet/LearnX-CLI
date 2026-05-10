@@ -90,6 +90,40 @@ class TimingEntry:
     end_ms: int  # exclusive end; end_ms - start_ms == len(audio) in ms
 
 
+VALID_VISUAL_TYPES: frozenset[str] = frozenset(
+    {
+        "hook_question",
+        "definition",
+        "analogy",
+        "comparison",
+        "code_example",
+        "diagram",
+        "question_prompt",
+        "decision_guide",
+        "key_insight",
+        "memory_hook",
+    }
+)
+
+
+@dataclass
+class SlideSegment:
+    unit_index: int
+    segment_index: int
+    lines_start: int
+    lines_end: int
+    visual_type: str
+    title: str
+    body: str | None
+    code: str | None
+    language: str | None
+    mermaid: str | None
+    left: str | None
+    right: str | None
+    rows: list | None
+    png_path: str = ""
+
+
 @dataclass
 class VisualSpec:
     unit_index: int
