@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(py -m pytest*)",
+      "Bash(py -m ruff check*)",
+      "Bash(py -m ruff format*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git checkout main)",
+      "Bash(git checkout -b sandbox/*)",
+      "Bash(git branch*)"
+    ],
+    "deny": [
+      "Bash(git push*)",
+      "Bash(git merge*)",
+      "Bash(git reset*)",
+      "Bash(git branch -D*)"
+    ]
+  }
+}
