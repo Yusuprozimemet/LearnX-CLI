@@ -49,4 +49,17 @@ tutor.log
 .DS_Store
 Thumbs.db
 
+# Reference repos — cloned locally for reading, not part of this project
 ralphex/
+
+# Docker build artifacts
+.docker/
+*.dockerignore.bak
+
+# Dev workflow scripts output
+scripts/__pycache__/
+
+# sandbox/ prototype scripts — tracked selectively; outputs are not
+sandbox/*.log
+sandbox/*.json
+sandbox/*.mp3
