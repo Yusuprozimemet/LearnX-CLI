@@ -59,6 +59,9 @@ ralphex/
 # Dev workflow scripts output
 scripts/__pycache__/
 
+# Assisted mode runtime settings override — written and deleted by learnx_dk.py
+.claude/settings.local.json
+
 # sandbox/ prototype scripts — tracked selectively; outputs are not
 sandbox/*.log
 sandbox/*.json

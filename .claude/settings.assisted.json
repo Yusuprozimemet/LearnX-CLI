@@ -1,0 +1,27 @@
+{
+  "_comment": [
+    "Assisted mode reference. NOT loaded directly by Claude Code.",
+    "The wrapper writes this content to .claude/settings.local.json at session start",
+    "and deletes it on exit. settings.local.json is gitignored.",
+    "Deny rules removed — local git ops happen without prompts.",
+    "git push and git merge to main still require approval (no allow rule for them)."
+  ],
+  "permissions": {
+    "allow": [
+      "Bash(py -m pytest*)",
+      "Bash(py -m ruff*)",
+      "Bash(python*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git checkout*)",
+      "Bash(git branch*)",
+      "Bash(git stash*)",
+      "Read(*)",
+      "Edit(*)",
+      "Write(*)"
+    ]
+  }
+}
