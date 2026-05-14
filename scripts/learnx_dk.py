@@ -84,6 +84,8 @@ def build_docker_command(
     ]
     if claude_dir.exists():
         cmd += ["-v", f"{_to_posix(claude_dir)}:/home/dev/.claude:ro"]
+        # Claude Code writes session state here; anonymous volume keeps .claude read-only
+        cmd += ["-v", "/home/dev/.claude/session-env"]
     if gitconfig.exists():
         cmd += ["-v", f"{_to_posix(gitconfig)}:/home/dev/.gitconfig:ro"]
 
