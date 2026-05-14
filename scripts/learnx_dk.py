@@ -158,7 +158,7 @@ def run_yolo(
     e2e_cmd = ["python", "-m", "pytest", "tutor/tests/e2e/", "-v"]
     review_cmd = ["python", "scripts/run_review.py"]
     if spec_path:
-        review_cmd += ["--spec", str(spec_path)]
+        review_cmd += ["--spec", spec_path.as_posix()]
 
     if dry_run:
         print("# Step 1 — container session")
