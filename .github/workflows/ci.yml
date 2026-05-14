@@ -30,6 +30,7 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
     needs: lint
+    if: true  # change to false to skip unit tests
     steps:
       - uses: actions/checkout@v4
 
@@ -49,6 +50,7 @@ jobs:
     name: E2E Smoke Tests
     runs-on: ubuntu-latest
     needs: unit-tests
+    if: true  # change to false to skip e2e tests
     steps:
       - uses: actions/checkout@v4
 
