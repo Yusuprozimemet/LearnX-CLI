@@ -185,8 +185,8 @@ def test_exact_duration_uses_lines_start_and_end() -> None:
         tj,
         [30.0],
     )
-    # raw = 9000-2000 = 7000ms, +3 lines * SILENCE_TURN_MS(500ms) = 8500ms = 8.5 s
-    assert timings[1][1] == pytest.approx(8.5, abs=0.01)
+    # raw = 9000-2000 = 7000ms, +1 trailing SILENCE_TURN_MS(500ms) = 7500ms = 7.5 s
+    assert timings[1][1] == pytest.approx(7.5, abs=0.01)
 
 
 def test_proportional_fallback_when_timing_absent() -> None:
@@ -260,7 +260,7 @@ def test_timing_gap_accounted_in_exact_duration() -> None:
         {"line_index": 2, "start_ms": 3000, "end_ms": 4000},
     ]
     raw_ms = 4000 - 0  # end_ms of last - start_ms of first
-    expected_s = (raw_ms + 3 * SILENCE_TURN_MS) / 1000.0
+    expected_s = (raw_ms + SILENCE_TURN_MS) / 1000.0
     assert _exact_duration(seg, unit_timing) == pytest.approx(expected_s, abs=0.01)
 
 
@@ -276,6 +276,36 @@ def test_single_line_segment_includes_one_gap() -> None:
     raw_ms = 5500 - 1300
     expected_s = max((raw_ms + 1 * SILENCE_TURN_MS) / 1000.0, MIN_SLIDE_DURATION)
     assert _exact_duration(seg, unit_timing) == pytest.approx(expected_s, abs=0.01)
+
+
+def test_exact_duration_single_line_adds_one_turn_silence() -> None:
+    """Single line: duration = (end - start) + 1 × SILENCE_TURN_MS."""
+    from tutor.constants import SILENCE_TURN_MS
+    from tutor.visual.beat_timer import _exact_duration
+
+    seg = _make_seg(lines_start=0, lines_end=0)
+    unit_timing = [{"start_ms": 0, "end_ms": 2000}]
+    dur = _exact_duration(seg, unit_timing)
+    expected_ms = (2000 - 0) + SILENCE_TURN_MS
+    assert abs(dur - expected_ms / 1000.0) < 0.001
+
+
+def test_exact_duration_multi_line_still_adds_one_turn_silence() -> None:
+    """5-line segment: only 1 trailing silence added, not 5."""
+    from tutor.constants import SILENCE_TURN_MS
+    from tutor.visual.beat_timer import _exact_duration
+
+    seg = _make_seg(lines_start=0, lines_end=4)
+    unit_timing = [
+        {"start_ms": 0, "end_ms": 1000},
+        {"start_ms": 1500, "end_ms": 2500},
+        {"start_ms": 3000, "end_ms": 4000},
+        {"start_ms": 4500, "end_ms": 5500},
+        {"start_ms": 6000, "end_ms": 7000},
+    ]
+    dur = _exact_duration(seg, unit_timing)
+    expected_ms = (7000 - 0) + SILENCE_TURN_MS  # raw span + 1 trailing silence
+    assert abs(dur - expected_ms / 1000.0) < 0.001
 
 
 def test_v2_function_still_callable() -> None:

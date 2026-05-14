@@ -229,21 +229,31 @@ def _concat_unit_videos(unit_mp4s: list[Path], output: Path) -> Path:
     lines = ["ffconcat version 1.0"] + [f"file '{p.name}'" for p in unit_mp4s]
     list_path.write_text("\n".join(lines), encoding="utf-8")
 
-    _run_ffmpeg(
+    args = [
+        "ffmpeg",
+        "-y",
+        "-f",
+        "concat",
+        "-safe",
+        "0",
+        "-i",
+        str(list_path),
+        "-c:v",
+        "copy",
+    ]
+    args.extend(["-c:a", "aac"])
+    args.extend(
         [
-            "ffmpeg",
-            "-y",
-            "-f",
-            "concat",
-            "-safe",
-            "0",
-            "-i",
-            str(list_path),
-            "-c",
-            "copy",
+            "-b:a",
+            AUDIO_BITRATE,
+            "-ar",
+            "44100",
+            "-ac",
+            "2",
             str(output),
         ]
     )
+    _run_ffmpeg(args)
     return output
 
 
