@@ -82,6 +82,20 @@ def test_output_paths_in_video_dir(tmp_path):
     assert str(audio_dir) not in content
 
 
+def test_concat_unit_videos_re_encodes_audio(tmp_path):
+    """_concat_unit_videos must NOT use bare -c copy — audio must be re-encoded."""
+    import inspect
+
+    from tutor.visual.video_assembler import _concat_unit_videos
+
+    src = inspect.getsource(_concat_unit_videos)
+    assert '"-c", "copy"' not in src, (
+        "_concat_unit_videos must re-encode audio (use -c:v copy + -c:a aac), "
+        "not bare -c copy, to fix timestamp discontinuities after concat"
+    )
+    assert '"-c:a", "aac"' in src
+
+
 def test_concat_script_single_entry(tmp_path):
     entries = [(tmp_path / "only_slide.png", 4.0)]
     script = tmp_path / "single.concat.txt"
