@@ -223,6 +223,27 @@ To keep context clean during an autonomous run:
 This matches what you are already doing. Autonomy does not change the hygiene rule —
 it just means the session runs longer before you need to check in.
 
+### Level 4 — Autonomous session via Docker container (the goal state)
+
+```
+You: python scripts/learnx_dk.py
+     [paste handoff prompt inside the container session]
+     [walk away]
+Claude: [implements → runs python -m pytest → reads output → fixes → runs again → reports]
+You: python scripts/run_review.py --spec specs/v3/dayN.md
+     [read findings, read diff, merge or push back]
+```
+
+This is Level 4 because:
+- You do not approve individual commands (--dangerously-skip-permissions)
+- You do not run tests yourself (agent runs python -m pytest directly)
+- You do not watch the session (container handles isolation)
+- You return to a report, not a question
+
+Level 4 is safe here because the container is the sandbox. The four-pillar structure
+(spec-driven, context hygiene, sandbox branch, acceptance criteria exit condition) is
+unchanged. The container adds a hard filesystem boundary on top of the branch boundary.
+
 ---
 
 ## The Honest Boundaries

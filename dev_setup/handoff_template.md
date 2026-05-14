@@ -1,5 +1,46 @@
 # Handoff Template — LearnX Spec Days
 
+## Container Mode (Level 4) — Recommended
+
+Use this when you want uninterrupted autonomous execution.
+
+### Prerequisites
+- `docker build -t learnx-dev .` has been run at least once
+- You are on a `sandbox/dayN` branch (created on the host as usual)
+
+### Handoff steps
+
+1. Start the container session:
+   ```powershell
+   python scripts/learnx_dk.py
+   ```
+
+2. Paste this prompt inside the container Claude session:
+   ```
+   Spec:         specs/v3/day<N>.md
+   Branch:       sandbox/day<N> (already created on host)
+   Files:        [list from spec data boundary]
+   Test command: python -m pytest tutor/tests/<folder>/ -v
+   Merge gate:   python -m pytest && python -m ruff check tutor/
+
+   Implement all changes in the spec. Run tests after each change.
+   Fix failures. When all acceptance criteria are green and the gate passes,
+   report: which criteria are green, gate output, files changed.
+   ```
+
+3. Walk away. Come back when the agent reports.
+
+4. Run the review from the host:
+   ```powershell
+   python scripts/run_review.py --spec specs/v3/day<N>.md
+   ```
+
+5. Read findings + `git diff main...HEAD`. Merge if clean.
+
+---
+
+## Host Mode (Level 1–3)
+
 ## What This Is
 
 A copy-paste prompt for starting each spec day in a **fresh session**.
