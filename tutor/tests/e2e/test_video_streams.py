@@ -6,6 +6,7 @@ import pytest
 
 
 def ffprobe_streams(path):
+    """Run ffprobe on path and return the list of stream dicts."""
     result = subprocess.run(
         [
             "ffprobe", "-v", "error",
@@ -19,10 +20,12 @@ def ffprobe_streams(path):
 
 
 def _get_mp4(pipeline_output):
+    """Return the expected tutorial.mp4 path inside pipeline_output."""
     return pipeline_output / "tutorial.mp4"
 
 
 def test_video_file_exists(pipeline_output):
+    """Assert tutorial.mp4 exists and has non-zero size; skip if absent."""
     mp4 = _get_mp4(pipeline_output)
     if not mp4.exists():
         pytest.skip("tutorial.mp4 not present — video pipeline not run")
@@ -30,6 +33,7 @@ def test_video_file_exists(pipeline_output):
 
 
 def test_video_stream_present(pipeline_output):
+    """Assert tutorial.mp4 contains at least one video stream."""
     mp4 = _get_mp4(pipeline_output)
     if not mp4.exists():
         pytest.skip("tutorial.mp4 not present — video pipeline not run")
@@ -39,6 +43,7 @@ def test_video_stream_present(pipeline_output):
 
 
 def test_audio_stream_present(pipeline_output):
+    """Assert tutorial.mp4 contains an audio stream — catches the silent-video bug."""
     mp4 = _get_mp4(pipeline_output)
     if not mp4.exists():
         pytest.skip("tutorial.mp4 not present — video pipeline not run")
@@ -51,6 +56,7 @@ def test_audio_stream_present(pipeline_output):
 
 
 def test_audio_stream_duration_nonzero(pipeline_output):
+    """Assert the audio stream duration is greater than zero."""
     mp4 = _get_mp4(pipeline_output)
     if not mp4.exists():
         pytest.skip("tutorial.mp4 not present — video pipeline not run")
@@ -62,6 +68,7 @@ def test_audio_stream_duration_nonzero(pipeline_output):
 
 
 def test_audio_stream_not_muted(pipeline_output):
+    """Assert audio stream bitrate is non-zero, ruling out a muted stream."""
     mp4 = _get_mp4(pipeline_output)
     if not mp4.exists():
         pytest.skip("tutorial.mp4 not present — video pipeline not run")

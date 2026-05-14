@@ -10,6 +10,7 @@ SCREENSHOT_PATH = pathlib.Path(tempfile.gettempdir()) / "learnx_e2e_smoke" / "sl
 
 @pytest.fixture(scope="module")
 def browser_page(pipeline_output):
+    """Launch a Playwright Chromium browser and yield a reusable page object."""
     if not SLIDE_DIR.exists():
         pytest.skip("slides/ directory not present — visual pipeline not run")
     from playwright.sync_api import sync_playwright
@@ -21,6 +22,7 @@ def browser_page(pipeline_output):
 
 
 def test_at_least_one_slide_exists(pipeline_output):
+    """Assert the slides/ directory contains at least one .html file."""
     if not SLIDE_DIR.exists():
         pytest.skip("slides/ directory not present — visual pipeline not run")
     html_files = list(SLIDE_DIR.glob("*.html"))
@@ -28,6 +30,7 @@ def test_at_least_one_slide_exists(pipeline_output):
 
 
 def test_slide_page_not_blank(browser_page):
+    """Assert the first slide's page content exceeds 500 characters."""
     html_files = sorted(SLIDE_DIR.glob("*.html"))
     first_slide = html_files[0].as_uri()
     browser_page.goto(first_slide)
@@ -38,6 +41,7 @@ def test_slide_page_not_blank(browser_page):
 
 
 def test_slide_has_visible_text(browser_page):
+    """Assert the first slide has non-empty visible body text."""
     html_files = sorted(SLIDE_DIR.glob("*.html"))
     first_slide = html_files[0].as_uri()
     browser_page.goto(first_slide)
@@ -46,6 +50,7 @@ def test_slide_has_visible_text(browser_page):
 
 
 def test_slide_no_error_messages(browser_page):
+    """Assert no 'Error' or 'TypeError' text appears in the slide body."""
     html_files = sorted(SLIDE_DIR.glob("*.html"))
     first_slide = html_files[0].as_uri()
     browser_page.goto(first_slide)
@@ -55,6 +60,7 @@ def test_slide_no_error_messages(browser_page):
 
 
 def test_slide_screenshot_saved(browser_page):
+    """Assert a non-blank screenshot can be taken and saved from the first slide."""
     html_files = sorted(SLIDE_DIR.glob("*.html"))
     first_slide = html_files[0].as_uri()
     browser_page.goto(first_slide)

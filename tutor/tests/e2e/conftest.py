@@ -57,7 +57,8 @@ SUMMARIZE_RESPONSE = (
 )
 
 
-def _mock_llm(messages, call_type="dialogue", **kwargs):
+def _mock_llm(messages, call_type="dialogue", **kwargs):  # noqa: ARG001
+    """Return fixed LLM responses keyed on call_type, bypassing the real API."""
     if call_type == "summarize":
         return SUMMARIZE_RESPONSE
     if call_type == "curriculum":
