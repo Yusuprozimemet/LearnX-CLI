@@ -25,6 +25,8 @@ import pathlib
 import subprocess
 import sys
 
+_PY = sys.executable  # venv-aware Python for host post-container steps
+
 # ── constants ────────────────────────────────────────────────────────────────
 
 IMAGE = "learnx-dev"
@@ -62,9 +64,9 @@ def _to_posix(p: pathlib.Path) -> str:
 
 def _print_banner(mode: str) -> None:
     width = 60
-    print("─" * width)
-    print(f"  learnx_dk  ·  {BANNER[mode]}")
-    print("─" * width)
+    print("-" * width)
+    print(f"  learnx_dk  |  {BANNER[mode]}")
+    print("-" * width)
 
 
 def build_docker_command(
@@ -74,6 +76,7 @@ def build_docker_command(
 ) -> list[str]:
     """Build the docker run command (unchanged from Day 2)."""
     claude_dir = home_dir / ".claude"
+    claude_json = home_dir / ".claude.json"
     gitconfig = home_dir / ".gitconfig"
 
     cmd = [
@@ -82,6 +85,10 @@ def build_docker_command(
     ]
     if claude_dir.exists():
         cmd += ["-v", f"{_to_posix(claude_dir)}:/home/dev/.claude:ro"]
+        # Claude Code writes session state here; anonymous volume keeps .claude read-only
+        cmd += ["-v", "/home/dev/.claude/session-env"]
+    if claude_json.exists():
+        cmd += ["-v", f"{_to_posix(claude_json)}:/home/dev/.claude.json:ro"]
     if gitconfig.exists():
         cmd += ["-v", f"{_to_posix(gitconfig)}:/home/dev/.gitconfig:ro"]
 
@@ -147,6 +154,17 @@ def run_container(
     subprocess.run(cmd, check=False)
 
 
+def _build_e2e_command(project_dir: pathlib.Path) -> list[str]:
+    """Run E2E tests inside the container — ffmpeg, Playwright, and chromium are there."""
+    return [
+        "docker", "run", "--rm",
+        "-v", f"{_to_posix(project_dir)}:{WORKSPACE}",
+        "-w", WORKSPACE,
+        IMAGE,
+        "python", "-m", "pytest", "tutor/tests/e2e/", "-v",
+    ]
+
+
 def run_yolo(
     project_dir: pathlib.Path,
     home_dir: pathlib.Path,
@@ -155,15 +173,15 @@ def run_yolo(
     dry_run: bool,
 ) -> None:
     container_cmd = build_docker_command(project_dir, home_dir, extra_args)
-    e2e_cmd = ["python", "-m", "pytest", "tutor/tests/e2e/", "-v"]
-    review_cmd = ["python", "scripts/run_review.py"]
+    e2e_cmd = _build_e2e_command(project_dir)
+    review_cmd = [_PY, "scripts/run_review.py"]
     if spec_path:
         review_cmd += ["--spec", spec_path.as_posix()]
 
     if dry_run:
         print("# Step 1 — container session")
         print(" ".join(container_cmd))
-        print("# Step 2 — E2E smoke tests (runs after container exits)")
+        print("# Step 2 — E2E smoke tests (inside container — ffmpeg + Playwright available)")
         print(" ".join(e2e_cmd))
         print("# Step 3 — review pipeline")
         print(" ".join(review_cmd))
@@ -172,7 +190,7 @@ def run_yolo(
     print("\n[yolo] starting container session...")
     subprocess.run(container_cmd, check=False)
 
-    print("\n[yolo] container exited — running E2E smoke tests...")
+    print("\n[yolo] container exited — running E2E smoke tests in container...")
     e2e_result = subprocess.run(e2e_cmd, check=False)
 
     print("\n[yolo] running review pipeline...")
