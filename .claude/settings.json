@@ -1,11 +1,8 @@
 {
   "_comment": [
-    "Deny rules removed in dev_setup_update Day 2.",
-    "Previously: git push, git merge, git reset, git branch -D were denied.",
-    "Now: agent runs inside the learnx-dev Docker container via scripts/learnx_dk.py.",
-    "The container mounts only this repo at /workspace — it cannot reach GitHub,",
-    "other directories, or your SSH keys. The container IS the sandbox.",
-    "See dev_setup/container_plan.md for the rationale."
+    "Supervised mode — the committed host default.",
+    "Use python scripts/learnx_dk.py --mode to select a different mode.",
+    "Container modes (container, yolo) ignore this file entirely."
   ],
   "permissions": {
     "allow": [
@@ -18,6 +15,12 @@
       "Bash(git checkout main)",
       "Bash(git checkout -b sandbox/*)",
       "Bash(git branch*)"
+    ],
+    "deny": [
+      "Bash(git push*)",
+      "Bash(git merge*)",
+      "Bash(git reset*)",
+      "Bash(git branch -D*)"
     ]
   }
 }
