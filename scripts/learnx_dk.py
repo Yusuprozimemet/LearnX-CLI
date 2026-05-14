@@ -76,6 +76,7 @@ def build_docker_command(
 ) -> list[str]:
     """Build the docker run command (unchanged from Day 2)."""
     claude_dir = home_dir / ".claude"
+    claude_json = home_dir / ".claude.json"
     gitconfig = home_dir / ".gitconfig"
 
     cmd = [
@@ -86,6 +87,8 @@ def build_docker_command(
         cmd += ["-v", f"{_to_posix(claude_dir)}:/home/dev/.claude:ro"]
         # Claude Code writes session state here; anonymous volume keeps .claude read-only
         cmd += ["-v", "/home/dev/.claude/session-env"]
+    if claude_json.exists():
+        cmd += ["-v", f"{_to_posix(claude_json)}:/home/dev/.claude.json:ro"]
     if gitconfig.exists():
         cmd += ["-v", f"{_to_posix(gitconfig)}:/home/dev/.gitconfig:ro"]
 
