@@ -19,22 +19,28 @@ Primary platform: Windows / PowerShell. Python 3.12+.
 ## Project Layout
 
 ```
-specs/          versioned spec files — the source of truth for all code
+specs/          versioned spec files — source of truth for all code
   v0/ v1/ v2/   completed versions (kept for regression reference)
-  v3/           current work: day13.md, day14.md, day15.md, day16.md
+  v3/           completed: day13.md, day14.md, day15.md, day16.md
 
 plan/           version-level design documents
   v0_plan.md … v3_plan.md
 
-fixes/          post-mortem notes for surprises (fix001.md … fix015.md)
+fixes/          post-mortem notes for surprises (fix001.md … fix017.md)
                 read these before starting work — they contain env/API gotchas
 
-dev_setup/      developer process documentation (read before first session)
+dev_setup/      developer process documentation
   spec-driven_plan.md      what SDD means and how to write specs
   context_hygiene_plan.md  how to manage session context
   sandbox_plan.md          git branch + test isolation strategy
-  autonomy_plan.md         how to run the implement→test→fix loop
+  autonomy_plan.md         how to run the implement→test→fix loop (Level 1–4)
   handoff_template.md      copy-paste prompt for starting each spec day
+  container_plan.md        how to run Claude inside Docker (Level 4 workflow)
+
+dev_setup_update/  workflow upgrade specs (v4)
+  update_plan.md     upgrade goals and rationale
+  architecture.md    component map and data flow
+  specs/day0.md … day7.md
 
 tutor/          the Python package
   models.py          all dataclasses — start here to understand data shapes
@@ -46,10 +52,20 @@ tutor/          the Python package
   visual/            video pipeline (beat_timer, slide_compositor, subtitle_writer…)
   player/            interactive playback
   cli/               CLI commands and shell
-  tests/             pytest suite — mirrors tutor/ structure
+  tests/             pytest unit suite — mirrors tutor/ structure
+  tests/e2e/         E2E smoke tests — run real pipeline, check output quality
   infra/             LLM client wrapper
 
+scripts/        dev workflow tooling (NOT imported by tutor/)
+  learnx_dk.py    run Claude inside Docker container
+  run_review.py   trigger 5-agent code + product review
+  tests/          pytest tests for the scripts themselves
+
 sandbox/        throwaway prototype scripts — NOT imported by tutor/
+
+.claude/
+  settings.json   allow list only (deny rules removed — Docker is the sandbox)
+  agents/         review + product check agent definitions
 ```
 
 ---
@@ -92,49 +108,60 @@ Follow these steps for every spec day, in order:
 1.  Read the spec completely (specs/v3/dayN.md)
 2.  git checkout main
 3.  git checkout -b sandbox/dayN
-4.  Implement only the files listed in the spec's "Data boundary" / file list
-5.  py -m pytest tutor/tests/<relevant_folder>/ -v          ← scoped run
-6.  If failures: read output, fix, go to step 5
-7.  py -m pytest                                            ← full suite
-8.  py -m ruff check tutor/
-9.  py -m ruff format --check tutor/
-10. If anything fails in 7-9: fix it, re-run
-11. Report: acceptance criteria checklist, gate status, files changed
-12. STOP — do not merge to main; the human reviews and merges
+4.  Start the container session:
+      python scripts/learnx_dk.py
+    (or run directly on host for quick one-off tasks)
+5.  Implement only the files listed in the spec's "Data boundary"
+6.  python -m pytest tutor/tests/<relevant_folder>/ -v    ← scoped run (inside container)
+7.  If failures: read output, fix, go to step 6
+8.  python -m pytest                                       ← full unit suite
+9.  python -m pytest tutor/tests/e2e/ -v                  ← E2E smoke tests (new)
+10. python -m ruff check tutor/
+11. python -m ruff format --check tutor/
+12. If anything fails in 8-11: fix, re-run
+13. python scripts/run_review.py --spec specs/v3/dayN.md  ← review agents (new)
+14. Report:
+      - acceptance criteria checklist (PASS / FAIL for each)
+      - gate status (all green / what failed)
+      - files changed (list)
+      - surprises encountered: any non-obvious env quirk, API edge case, or tool
+        gotcha you hit during the session — one bullet per item, with context.
+        Write "none" if nothing surprised you.
+        Do NOT write to fixes/ — just list them here for the human to decide.
+15. STOP — do not merge to main; the human reviews findings + diff + screenshots
 ```
 
-Never skip step 12. Never merge autonomously.
+Note: steps 6–11 use `python` (Linux inside container), not `py` (Windows host).
+When running on host directly, use `py` as before.
+
+Never skip step 15. Never merge autonomously.
 
 ---
 
-## Current State — What Is Ready to Implement
+## Current State
 
-v3 specs are written and waiting. None have been started yet.
+v3 specs — all completed and merged to main.
 
-| Day | Spec | Status | Branch to create |
-|-----|------|--------|-----------------|
-| 13  | `specs/v3/day13.md` — Exact timing capture from audio builder | **Not started** | `sandbox/day13` |
-| 14  | `specs/v3/day14.md` — Dialogue-aware visual segment planner | Not started | `sandbox/day14` |
-| 15  | `specs/v3/day15.md` — HTML slide renderer (Playwright + Jinja2) | Not started | `sandbox/day15` |
-| 16  | `specs/v3/day16.md` — Full pipeline integration | Not started | `sandbox/day16` |
+| Day | Spec | Status |
+|-----|------|--------|
+| 13 | `specs/v3/day13.md` — Exact timing capture | Merged |
+| 14 | `specs/v3/day14.md` — Dialogue-aware visual segment planner | Merged |
+| 15 | `specs/v3/day15.md` — HTML slide renderer (Playwright + Jinja2) | Merged |
+| 16 | `specs/v3/day16.md` — Full pipeline integration | Merged |
 
-**Day 13 is the correct starting point.** Days 14–16 depend on it.
+v4 workflow upgrade — all completed and merged to main. See `dev_setup_update/update_plan.md`.
 
-Day 13 key facts:
-- Modify `_concat_with_silence()` in `tutor/audio/audio_builder.py` to capture timing
-- Add `TimingEntry` dataclass to `tutor/models.py`
-- Write `tutorial.timing.json` from `_assemble()`; keys are plain string integers (`"1"`, `"2"`, …)
-- Extend `tutor/tests/audio/test_audio_builder.py` with 7 new tests
-- `build()` public API must not change
-
-Day 15 key facts (different from old plan — read carefully):
-- Replaces Pillow with Playwright + Jinja2 HTML templates
-- Deletes `slide_compositor.py`, `slide_draw.py`, `slide_theme.py`, `diagram_renderer.py`
-  and their test files
-- New file: `tutor/visual/slide_renderer.py`
-- New directories: `tutor/visual/templates/` and `tutor/assets/html/`
-- Adds `playwright>=1.44` and `jinja2>=3.1` to `pyproject.toml`
-- Requires one-time `playwright install chromium` (add to CI)
+| Day | Spec | Goal | Status |
+|-----|------|------|--------|
+| 0  | `dev_setup_update/specs/day0.md`  | Repository cleanup | Merged |
+| 1  | `dev_setup_update/specs/day1.md`  | Docker image | Merged |
+| 2  | `dev_setup_update/specs/day2.md`  | Container wrapper + settings | Merged |
+| 2b | `dev_setup_update/specs/day2b.md` | Launcher modes (supervised/assisted/container/yolo) | Merged |
+| 3  | `dev_setup_update/specs/day3.md`  | Review pipeline + product check | Merged |
+| 4  | `dev_setup_update/specs/day4.md`  | Dev_setup documentation | Merged |
+| 5  | `dev_setup_update/specs/day5.md`  | E2E smoke tests | Merged |
+| 6  | `dev_setup_update/specs/day6.md`  | CI/CD update | Merged |
+| 7  | `dev_setup_update/specs/day7.md`  | CLAUDE.md update (this file) | Merged |
 
 ---
 
@@ -154,24 +181,35 @@ NEVER start Day N+1 until Day N is merged to main
 ## Commands Reference
 
 ```powershell
-# Start a spec day
+# ── Start a spec day ─────────────────────────────────────────
 git checkout main
 git checkout -b sandbox/day<N>
 
-# Scoped test run (fast feedback)
-py -m pytest tutor/tests/<folder>/ -v
+# ── Run agent inside container (v4 workflow — no permission prompts) ──
+python scripts/learnx_dk.py
 
-# Merge gate (run before reporting done)
-py -m pytest
+# ── Scoped test run (fast feedback) ──────────────────────────
+# Inside container:      python -m pytest tutor/tests/<folder>/ -v
+# On host (legacy):      py -m pytest tutor/tests/<folder>/ -v
+
+# ── Merge gate (run before reporting done) ───────────────────
+py -m pytest tutor/tests/ --ignore=tutor/tests/e2e/   # unit tests
+py -m pytest tutor/tests/e2e/ -v                       # E2E smoke tests
 py -m ruff check tutor/
 py -m ruff format --check tutor/
 
-# Merge (human runs this, not the agent)
+# ── Review pipeline ──────────────────────────────────────────
+python scripts/run_review.py --spec specs/v3/day<N>.md
+
+# ── Rebuild Docker image (only when requirements.txt changes) ─
+docker build -t learnx-dev .
+
+# ── Merge (human runs this, not the agent) ───────────────────
 git checkout main
 git merge sandbox/day<N>
 git branch -d sandbox/day<N>
 
-# Discard a bad sandbox branch
+# ── Discard a bad sandbox branch ────────────────────────────
 git checkout main
 git branch -D sandbox/day<N>
 ```
