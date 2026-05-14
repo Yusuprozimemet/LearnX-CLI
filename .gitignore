@@ -66,3 +66,6 @@ scripts/__pycache__/
 sandbox/*.log
 sandbox/*.json
 sandbox/*.mp3
+
+problems/
+week3/
