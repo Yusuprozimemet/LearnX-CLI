@@ -25,6 +25,8 @@ import pathlib
 import subprocess
 import sys
 
+_PY = sys.executable  # venv-aware Python for host post-container steps
+
 # ── constants ────────────────────────────────────────────────────────────────
 
 IMAGE = "learnx-dev"
@@ -62,9 +64,9 @@ def _to_posix(p: pathlib.Path) -> str:
 
 def _print_banner(mode: str) -> None:
     width = 60
-    print("─" * width)
-    print(f"  learnx_dk  ·  {BANNER[mode]}")
-    print("─" * width)
+    print("-" * width)
+    print(f"  learnx_dk  |  {BANNER[mode]}")
+    print("-" * width)
 
 
 def build_docker_command(
@@ -155,8 +157,8 @@ def run_yolo(
     dry_run: bool,
 ) -> None:
     container_cmd = build_docker_command(project_dir, home_dir, extra_args)
-    e2e_cmd = ["python", "-m", "pytest", "tutor/tests/e2e/", "-v"]
-    review_cmd = ["python", "scripts/run_review.py"]
+    e2e_cmd = [_PY, "-m", "pytest", "tutor/tests/e2e/", "-v"]
+    review_cmd = [_PY, "scripts/run_review.py"]
     if spec_path:
         review_cmd += ["--spec", spec_path.as_posix()]
 
