@@ -26,7 +26,7 @@ specs/          versioned spec files — source of truth for all code
 plan/           version-level design documents
   v0_plan.md … v3_plan.md
 
-fixes/          post-mortem notes for surprises (fix001.md … fix017.md)
+fixes/          post-mortem notes for surprises (fix001.md … fix021.md)
                 read these before starting work — they contain env/API gotchas
 
 dev_setup/      developer process documentation
