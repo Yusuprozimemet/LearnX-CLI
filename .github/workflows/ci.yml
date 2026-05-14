@@ -40,7 +40,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r tutor/requirements.txt
+          grep -v 'audioop-lts' tutor/requirements.txt > /tmp/requirements-filtered.txt
+          pip install -r /tmp/requirements-filtered.txt
           pip install -r tutor/requirements-dev.txt
 
       - name: Run unit tests
@@ -65,7 +66,8 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -r tutor/requirements.txt
+          grep -v 'audioop-lts' tutor/requirements.txt > /tmp/requirements-filtered.txt
+          pip install -r /tmp/requirements-filtered.txt
           pip install -r tutor/requirements-dev.txt
 
       - name: Install Playwright browsers
