@@ -50,8 +50,8 @@ def test_slide_no_error_messages(browser_page):
     first_slide = html_files[0].as_uri()
     browser_page.goto(first_slide)
     text = browser_page.locator("body").inner_text()
-    assert "Error" not in text, f"Slide contains 'Error' in visible text"
-    assert "TypeError" not in text, f"Slide contains 'TypeError' in visible text"
+    assert "Error" not in text, "Slide contains 'Error' in visible text"
+    assert "TypeError" not in text, "Slide contains 'TypeError' in visible text"
 
 
 def test_slide_screenshot_saved(browser_page):

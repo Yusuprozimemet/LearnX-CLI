@@ -1,5 +1,4 @@
 """Audio quality: not silent, duration reasonable, correct sample rate."""
-import pytest
 from pydub import AudioSegment
 
 

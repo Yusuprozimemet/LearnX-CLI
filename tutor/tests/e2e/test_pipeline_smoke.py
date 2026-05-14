@@ -1,8 +1,5 @@
 """Smoke test: full pipeline runs without crash and produces expected output files."""
 import json
-import pathlib
-
-import pytest
 
 
 def test_pipeline_exits_zero(pipeline_output):
