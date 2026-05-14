@@ -1,4 +1,5 @@
 """A/V sync: timing.json per-unit end_ms vs unit MP3 duration drift < 500ms."""
+
 import json
 
 import pytest

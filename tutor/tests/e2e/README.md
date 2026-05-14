@@ -17,22 +17,30 @@ because several bugs passed all unit tests but were caught here:
 ## How to Run
 
 ```powershell
-# E2E tests only
-py -m pytest tutor/tests/e2e/ -v
-
-# Unit tests only (fast, no LLM or TTS required)
-py -m pytest tutor/tests/ --ignore=tutor/tests/e2e/ -v
-
-# Full merge gate (both suites + lint)
-py -m pytest tutor/tests/ -v
+# Windows (PowerShell)
+py -m pytest tutor/tests/e2e/ -v           # E2E tests only
+py -m pytest tutor/tests/ --ignore=tutor/tests/e2e/ -v   # unit tests only
+py -m pytest tutor/tests/ -v               # full suite
 py -m ruff check tutor/
 py -m ruff format --check tutor/
+```
+
+```bash
+# macOS / Linux
+python -m pytest tutor/tests/e2e/ -v
+python -m pytest tutor/tests/ --ignore=tutor/tests/e2e/ -v
+python -m pytest tutor/tests/ -v
+python -m ruff check tutor/
+python -m ruff format --check tutor/
 ```
 
 ## Requirements
 
 - **Internet connection** — TTS (edge-tts) runs for real; the LLM is mocked
-- **ffmpeg** — must be on PATH or in a standard Windows install location
+- **ffmpeg + ffprobe** — must be on PATH or in a standard Windows install location;
+  required by pydub (audio loading) and `test_video_streams.py` stream checks
+- **Playwright Chromium** — required by `test_slide_render.py`;
+  install with `playwright install chromium` (already done in Docker image)
 - **No API key needed** — `GROQ_API_KEY` is injected as a dummy value by conftest.py
 
 ## Why the Fixture Is Small

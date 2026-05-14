@@ -1,21 +1,46 @@
 """Video stream verification: audio and video streams both present, durations non-zero."""
+
 import json
 import subprocess
 
 import pytest
 
 
+def _to_float(value, default: float = 0.0) -> float:
+    """Return float(value) or default when value is non-numeric (e.g. 'N/A')."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _to_int(value, default: int = 0) -> int:
+    """Return int(value) or default when value is non-numeric (e.g. 'N/A')."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def ffprobe_streams(path):
     """Run ffprobe on path and return the list of stream dicts."""
     result = subprocess.run(
         [
-            "ffprobe", "-v", "error",
-            "-show_entries", "stream=codec_type,duration,bit_rate",
-            "-of", "json", str(path),
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "stream=codec_type,duration,bit_rate",
+            "-of",
+            "json",
+            str(path),
         ],
         capture_output=True,
         text=True,
+        timeout=30,
     )
+    if result.returncode != 0:
+        pytest.fail(f"ffprobe failed (rc={result.returncode}): {result.stderr.strip()}")
     return json.loads(result.stdout)["streams"]
 
 
@@ -63,7 +88,7 @@ def test_audio_stream_duration_nonzero(pipeline_output):
     streams = ffprobe_streams(mp4)
     audio_streams = [s for s in streams if s.get("codec_type") == "audio"]
     assert audio_streams, "No audio stream found"
-    duration = float(audio_streams[0].get("duration", 0))
+    duration = _to_float(audio_streams[0].get("duration"))
     assert duration > 0, f"Audio stream has zero duration: {duration}"
 
 
@@ -75,5 +100,5 @@ def test_audio_stream_not_muted(pipeline_output):
     streams = ffprobe_streams(mp4)
     audio_streams = [s for s in streams if s.get("codec_type") == "audio"]
     assert audio_streams, "No audio stream found"
-    bit_rate = int(audio_streams[0].get("bit_rate", 0))
+    bit_rate = _to_int(audio_streams[0].get("bit_rate"))
     assert bit_rate > 0, f"Audio stream bitrate is zero — stream may be silent: {bit_rate}"

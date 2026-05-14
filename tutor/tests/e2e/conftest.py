@@ -5,6 +5,7 @@ The pipeline_output fixture runs the full LearnX pipeline once per test session,
 with the LLM mocked so no API key is needed. TTS (edge-tts) runs for real.
 All E2E test modules depend on this fixture.
 """
+
 import argparse
 import json
 import os
@@ -15,41 +16,47 @@ from unittest.mock import patch
 import pytest
 
 FIXTURE_DOC = pathlib.Path("tutor/tests/e2e/fixtures/sample.md")
+# Fixed path so inspecting artifacts after a run is easy. Tests are serial
+# (session fixture), so no race condition from parallel execution.
 OUTPUT_DIR = pathlib.Path(tempfile.gettempdir()) / "learnx_e2e_smoke"
 
-CURRICULUM_RESPONSE = json.dumps([
-    {
-        "concept": "What is a Variable?",
-        "complexity": 1,
-        "source_sections": ["s01"],
-        "key_facts": [
-            "A variable is a named container for a value",
-            "Variables have a name and hold a value",
-            "Variables can store numbers, text, or lists",
-        ],
-        "common_misconception": "Variables and constants are the same thing",
-        "good_analogy": "A labeled box in a warehouse",
-        "question_style": "recall",
-        "memory_hook": "Variable equals labeled box",
-        "word_budget": 200,
-        "prerequisite_concepts": [],
-        "js_contrast": "",
-        "production_relevance": "",
-    }
-])
+CURRICULUM_RESPONSE = json.dumps(
+    [
+        {
+            "concept": "What is a Variable?",
+            "complexity": 1,
+            "source_sections": ["s01"],
+            "key_facts": [
+                "A variable is a named container for a value",
+                "Variables have a name and hold a value",
+                "Variables can store numbers, text, or lists",
+            ],
+            "common_misconception": "Variables and constants are the same thing",
+            "good_analogy": "A labeled box in a warehouse",
+            "question_style": "recall",
+            "memory_hook": "Variable equals labeled box",
+            "word_budget": 200,
+            "prerequisite_concepts": [],
+            "js_contrast": "",
+            "production_relevance": "",
+        },
+    ]
+)
 
-DIALOGUE_RESPONSE = "\n".join([
-    "ALEX: Welcome to today's lesson on variables in programming.",
-    "MAYA: What exactly is a variable?",
-    "ALEX: Think of a variable as a labeled box that stores a value you can retrieve later.",
-    "MAYA: Like how I would label a container in my kitchen?",
-    "ALEX: Exactly. In Python you write age equals 25 to create a variable called age.",
-    "MAYA: And then I can use the name age later to get 25 back?",
-    "ALEX: That is right. Variables make programs readable and flexible.",
-    "MAYA: What types of values can a variable hold?",
-    "ALEX: Numbers, text, lists, and almost anything else your program needs.",
-    "MAYA: Great, now variables make much more sense to me.",
-])
+DIALOGUE_RESPONSE = "\n".join(
+    [
+        "ALEX: Welcome to today's lesson on variables in programming.",
+        "MAYA: What exactly is a variable?",
+        "ALEX: Think of a variable as a labeled box that stores a value you can retrieve later.",
+        "MAYA: Like how I would label a container in my kitchen?",
+        "ALEX: Exactly. In Python you write age equals 25 to create a variable called age.",
+        "MAYA: And then I can use the name age later to get 25 back?",
+        "ALEX: That is right. Variables make programs readable and flexible.",
+        "MAYA: What types of values can a variable hold?",
+        "ALEX: Numbers, text, lists, and almost anything else your program needs.",
+        "MAYA: Great, now variables make much more sense to me.",
+    ]
+)
 
 SUMMARIZE_RESPONSE = (
     "A variable is a named container that holds a value in a computer program. "
@@ -57,13 +64,15 @@ SUMMARIZE_RESPONSE = (
 )
 
 
-def _mock_llm(messages, call_type="dialogue", **kwargs):  # noqa: ARG001
+def _mock_llm(messages, call_type="dialogue", **kwargs):
     """Return fixed LLM responses keyed on call_type, bypassing the real API."""
     if call_type == "summarize":
         return SUMMARIZE_RESPONSE
     if call_type == "curriculum":
         return CURRICULUM_RESPONSE
-    return DIALOGUE_RESPONSE
+    if call_type == "dialogue":
+        return DIALOGUE_RESPONSE
+    raise ValueError(f"Unexpected LLM call_type in mock: {call_type!r}")
 
 
 @pytest.fixture(scope="session")
@@ -99,8 +108,10 @@ def pipeline_output():
         conversation=False,
     )
 
-    with patch("tutor.infra.llm.chat", side_effect=_mock_llm), \
-         patch.dict(os.environ, {"GROQ_API_KEY": "test-key-not-used"}):
+    with (
+        patch("tutor.infra.llm.chat", side_effect=_mock_llm),
+        patch.dict(os.environ, {"GROQ_API_KEY": "test-key-not-used"}),
+    ):
         cmd_generate(args)
 
     return OUTPUT_DIR

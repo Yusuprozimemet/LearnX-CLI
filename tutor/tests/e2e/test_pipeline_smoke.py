@@ -1,12 +1,11 @@
 """Smoke test: full pipeline runs without crash and produces expected output files."""
+
 import json
 
 
 def test_pipeline_exits_zero(pipeline_output):
     """Assert the pipeline ran successfully and created the output directory."""
-    assert pipeline_output.exists(), (
-        f"Output directory not created: {pipeline_output}"
-    )
+    assert pipeline_output.exists(), f"Output directory not created: {pipeline_output}"
 
 
 def test_mp3_exists_and_nonempty(pipeline_output):
