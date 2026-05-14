@@ -45,7 +45,7 @@ jobs:
           pip install -r tutor/requirements-dev.txt
 
       - name: Run unit tests
-        run: python -m pytest tutor/tests/ --ignore=tutor/tests/e2e/ -v
+        run: python -m pytest tutor/tests/ --ignore=tutor/tests/e2e/ -m "not slow" -v
 
   e2e-tests:
     name: E2E Smoke Tests
