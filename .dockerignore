@@ -1,0 +1,19 @@
+# Large generated directories — not needed in build context
+audio/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+
+# Version control
+.git/
+.gitignore
+
+# Dev environment
+.venv/
+*.egg-info/
+
+# OS noise
+.DS_Store
+Thumbs.db
