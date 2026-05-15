@@ -113,6 +113,7 @@ def cmd_generate(tokens: list[str], ctx: ShellContext) -> None:
               [--format FORMAT] [--topic TEXT] [--units N] [--no-cache]
               [--script-only] [--dry-run] [--provider groq|openrouter]
               [--verbose] [--debug]
+    Two expert hosts (ALEX and MAYA) walk through the document step by step.
     Output is saved to audio/<session>/ automatically."""
     if not tokens:
         print(theme.red("  Error: /generate requires a file path."))
@@ -282,10 +283,11 @@ def cmd_help(tokens: list[str], ctx: ShellContext) -> None:
 
   {theme.bold("/generate flags:")}
     --explain             Read-along mode: narrate document top-to-bottom (one unit per section)
-    --conversation        Concept-driven dialogue mode (default — can be omitted)
+    --conversation        Expert dialogue mode: ALEX and MAYA explain the document step by step (default)
     --duration N          Target length in minutes         (default: 20, conversation only)
     --difficulty LEVEL    beginner | intermediate | advanced (default: beginner, conversation only)
     --format FORMAT       tutor-student | dual-tutor        (default: tutor-student, conversation only)
+                          tutor-student: ALEX (male) + MAYA (female) | dual-tutor: ALEX + SAM (both male)
     --topic TEXT          Force a specific concept into the curriculum (conversation only)
     --units N             Cap the number of teaching units  (conversation only)
     --provider NAME       groq | openrouter                 (default: groq)
@@ -322,32 +324,38 @@ def cmd_help(tokens: list[str], ctx: ShellContext) -> None:
 
 {theme.bold("─── EXAMPLES ────────────────────────────────────────────────────────────────")}
 
-  {theme.bold("Read-along (explain) workflow:")}
-    /generate week2/2.md --explain
-    /play week2_2_explain
-    /next
-    /ask what does super() do here?
+  {theme.bold("1. Generate and listen (expert dialogue):")}
+    /generate week3/1.md --provider openrouter
+    /play week3_1                              (load the session)
+    /next                                      (move to next concept)
+    /ask why does == fail for Strings?         (ask anything mid-listen)
+    /summary                                   (print the memory hook for this unit)
+    /replay                                    (restart current unit)
     /stop
 
-  {theme.bold("Conversation workflow:")}
-    /generate week2/3.md
-    /generate week2/3.md --difficulty intermediate --topic "HashMap internals"
-    /dry-run notes.md --difficulty advanced
+  {theme.bold("2. Adjust difficulty or focus:")}
+    /generate week3/1.md --difficulty intermediate --provider openrouter
+    /generate week3/1.md --topic "HashMap internals" --provider openrouter
+    /generate week3/1.md --units 3 --provider openrouter
+
+  {theme.bold("3. Two male expert hosts instead of ALEX + MAYA:")}
+    /generate week3/1.md --format dual-tutor --provider openrouter
+
+  {theme.bold("4. Preview before generating (no LLM calls for audio):")}
+    /inspect week3/1.md                        (show chunk breakdown)
+    /dry-run week3/1.md                        (show planned units, no audio)
+
+  {theme.bold("5. Read-along (ALEX narrates the document top to bottom):")}
+    /generate week3/1.md --explain
+    /play week3_1_explain
+
+  {theme.bold("6. Render a video from an existing session:")}
+    /generate week3/1.md --provider openrouter (generate audio first)
+    /video week3_1                             (render slides + subtitles → MP4)
+    /vsessions                                 (list completed videos)
+
+  {theme.bold("7. See all sessions:")}
     /sessions
-    /play week2_3
-    /next
-    /ask what is the difference between == and .equals()?
-    /summary
-    /stop
-
-  {theme.bold("Video workflow:")}
-    /generate week2/3.md                 (run audio pipeline first)
-    /video week2_3                       (render video from existing session)
-    /vsessions                           (confirm video was created)
-
-  {theme.bold("Inspect without generating:")}
-    /inspect notes.md
-    /dry-run notes.md
 """
     print(lines)
 
