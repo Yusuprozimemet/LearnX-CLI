@@ -127,9 +127,11 @@ def cmd_generate(args: argparse.Namespace) -> None:
         units, all_lines = narrator.narrate_all(chunks, doc_title, llm_fn)
         script = assembler.assemble(units, all_lines, "explain", doc_title, mode="explain")
     else:
+        print(f"Summarising {len(chunks)} chunk(s)...")
         chunks = summarizer.summarize_all(chunks, llm_fn)
         _save_chunks(chunks, args.output)
 
+        print("Planning curriculum...")
         units = curriculum.plan(chunks, profile, args.duration, llm_fn, args.difficulty, args.topic)
         if args.units:
             units = units[: args.units]
@@ -138,7 +140,11 @@ def cmd_generate(args: argparse.Namespace) -> None:
             inspector.report_curriculum(units, chunks, args.duration)
             return
 
-        all_lines = [dialogue.generate(u, chunks, args.fmt, llm_fn, args.difficulty) for u in units]
+        print(f"Generating dialogue for {len(units)} unit(s)...")
+        all_lines = []
+        for i, u in enumerate(units, 1):
+            print(f"  [{i}/{len(units)}] {u.concept}")
+            all_lines.append(dialogue.generate(u, chunks, args.fmt, llm_fn, args.difficulty))
         script = assembler.assemble(units, all_lines, args.fmt, doc_title)
 
     _print_duration_estimate(script)

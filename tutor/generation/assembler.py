@@ -16,10 +16,11 @@ def assemble(
     for i, (unit, lines) in enumerate(zip(units, all_lines, strict=False)):
         result.extend(lines)
         if mode == "conversation" and i < len(units) - 1:
+            next_concept = units[i + 1].concept if i + 1 < len(units) else ""
             result.append(
                 DialogueLine(
-                    speaker="ALEX",
-                    text="Now let's look at something related that catches people in a different way.",
+                    speaker="MAYA",
+                    text=f"Alright, let's move on to the next one: {next_concept}.",
                     unit_number=unit.unit,
                 )
             )
@@ -39,13 +40,21 @@ def _build_intro(units: list[TeachingUnit], doc_title: str, mode: str) -> list[D
             f"I'll cover {len(units)} section{'s' if len(units) != 1 else ''} from top to bottom, "
             f"following the document as you read along."
         )
+        return [DialogueLine(speaker="ALEX", text=text, unit_number=0)]
     else:
-        text = (
-            f"Today we're covering {doc_title}. "
-            f"By the end of this session, you'll understand {len(units)} concepts "
-            f"that Java developers regularly get wrong. Let's start with a question."
+        concepts = ", ".join(u.concept for u in units)
+        alex_text = (
+            f"Welcome. In this session we're covering {doc_title}. "
+            f"We'll walk through {len(units)} concept{'s' if len(units) != 1 else ''} step by step: {concepts}."
         )
-    return [DialogueLine(speaker="ALEX", text=text, unit_number=0)]
+        maya_text = (
+            "We'll explain each one clearly, with analogies, so by the end you'll have "
+            "a solid picture of how it all fits together. Let's get into it."
+        )
+        return [
+            DialogueLine(speaker="ALEX", text=alex_text, unit_number=0),
+            DialogueLine(speaker="MAYA", text=maya_text, unit_number=0),
+        ]
 
 
 def _build_outro(units: list[TeachingUnit], doc_title: str, mode: str) -> list[DialogueLine]:
@@ -54,10 +63,19 @@ def _build_outro(units: list[TeachingUnit], doc_title: str, mode: str) -> list[D
             f"That covers all {len(units)} section{'s' if len(units) != 1 else ''} of {doc_title}. "
             f"You can replay any section with the replay command, or ask a question with ask."
         )
+        return [DialogueLine(speaker="ALEX", text=text, unit_number=-1)]
     else:
         hooks = ". ".join(u.memory_hook for u in units if u.memory_hook)
-        text = (
-            f"Before we finish — here are the things worth remembering. "
-            f"{hooks}. Keep those in mind next time you're reading Java code."
+        alex_text = (
+            f"That's everything for {doc_title}. "
+            f"We covered {len(units)} concept{'s' if len(units) != 1 else ''} today. "
+            f"Here's what to hold onto: {hooks}."
         )
-    return [DialogueLine(speaker="ALEX", text=text, unit_number=-1)]
+        maya_text = (
+            "If any of those didn't fully click, replay that unit and let it settle. "
+            "These are the ideas that show up constantly in real Java code."
+        )
+        return [
+            DialogueLine(speaker="ALEX", text=alex_text, unit_number=-1),
+            DialogueLine(speaker="MAYA", text=maya_text, unit_number=-1),
+        ]

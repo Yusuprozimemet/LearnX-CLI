@@ -17,12 +17,12 @@ visual     = "llama-3.3-70b-versatile"    # 70b needed for reliable DOT output
 segments   = "llama-3.3-70b-versatile"
 
 [providers.openrouter]
-curriculum = "google/gemma-3-27b-it:free"
-dialogue   = "meta-llama/llama-3.1-8b-instruct:free"
-summarize  = "meta-llama/llama-3.1-8b-instruct:free"
-qa         = "meta-llama/llama-3.1-8b-instruct:free"
-visual     = "google/gemma-3-27b-it:free"
-segments   = "google/gemma-3-27b-it:free"
+curriculum = "poolside/laguna-xs.2:free"
+dialogue   = "poolside/laguna-xs.2:free"
+summarize  = "poolside/laguna-xs.2:free"
+qa         = "poolside/laguna-xs.2:free"
+visual     = "poolside/laguna-xs.2:free"
+segments   = "poolside/laguna-xs.2:free"
 
 # ── Response token caps ──────────────────────────────────────
 # Max tokens the model may generate per call type.
@@ -41,12 +41,12 @@ segments   = 2000
 # max_source_tokens:          source text sent with each dialogue prompt
 # max_summarize_input_tokens: chunk text sent to the summariser
 #
-# dialogue uses llama-3.3-70b-versatile (128k context window on Groq).
-# 3000 source + ~1200 prompt overhead + 2000 response = ~6200 tokens — fine.
-# summarize/qa use llama-3.1-8b-instant; keep their inputs small.
+# dialogue uses llama-3.3-70b-versatile (128k context on Groq) or owl-alpha (OpenRouter).
+# 8000 source + ~1200 prompt overhead + 2000 response = ~11200 tokens — fine for both.
+# max_summarize_input_tokens kept at 3000; those calls send much smaller chunks.
 
 [limits]
-max_source_tokens          = 3000
+max_source_tokens          = 8000
 max_summarize_input_tokens = 3000
 max_visual_source_tokens   = 800
 
@@ -54,5 +54,5 @@ max_visual_source_tokens   = 800
 
 [llm]
 temperature   = 0.7
-retry_count   = 2       # attempts before giving up
+retry_count   = 3       # attempts before giving up
 retry_delay_s = 2.0     # seconds between retries

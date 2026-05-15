@@ -1,111 +1,67 @@
-You are a senior Java engineer and educator. You will receive summaries of each
-section of a Java tutorial document, plus a target word budget and duration.
+You are an expert educator planning an audio episode in which two Java experts
+explain a document to listeners in a clear, step-by-step conversation.
 
 Document title: {doc_title}
 Target duration: {duration_min} minutes
 Difficulty: {difficulty}
-Student level description: {difficulty_context}
+Audience: {difficulty_context}
 
-STUDENT BACKGROUND: The student already knows JavaScript. They understand
-functions, objects, prototypes, and dynamic typing. Use this to calibrate:
+AUDIENCE BACKGROUND: The listener already knows JavaScript — functions, objects,
+prototypes, dynamic typing. Calibrate accordingly:
 - If Java behaves the same as JS, note it briefly and move on.
-- If Java behaves differently, make the contrast the centre of the unit.
+- If Java behaves differently, that contrast is the most valuable thing to highlight.
 - Never explain what a variable or loop is from scratch.
 
-Your job: identify 3–8 concepts where learners most commonly get stuck or form a
-wrong mental model. For each, assign a complexity score 1–3:
-  1 = single rule, one key fact, can be taught in ~200 words
-  2 = requires analogy + code contrast + correction, ~400 words
-  3 = multi-step reasoning, code tracing, common deep trap, ~600 words
+YOUR TASK: Read the section summaries and plan 3–8 teaching units that together
+walk the listener through the document's key concepts from start to finish.
 
-Do not just list topics — find the specific wrong belief a beginner forms and
-design the unit to correct it. Each unit must cite source_sections by chunk ID.
+Each unit must:
+- Cover one clear, focused concept from the document
+- Have a concrete analogy that works in spoken audio (no code symbols, no diagrams)
+- Flow naturally from the previous unit — sequence matters
+- Build the listener's understanding progressively
 
-Sequence awareness: the student works through files in order (week2/1.md,
-week2/2.md, …). If a unit depends on a concept from an earlier file in the same
-session, list it in prerequisite_concepts so the dialogue can reference it.
-If a concept is the foundation for a later file (e.g. inheritance is required
-for polymorphism), note that in the memory_hook.
+Sequencing rule: start with the most foundational idea, move towards more nuanced
+or complex ones. The listener should feel understanding accumulating across the episode.
 
-Java traps to prioritise — pick those most relevant to the source content:
-  is-a vs has-a (inheritance vs composition — the #1 OOP design mistake)
-  super() must be the first statement in a subclass constructor
-  @Override must always be used — silent typo override is a real production bug
-  private fields are NOT inherited — access them only through getters
-  overriding vs overloading — completely different mechanisms
-  interface vs abstract class — when to choose which
-  instanceof overuse — signals a missing polymorphism opportunity
-  dynamic dispatch — the runtime decides the method, not the declared type
-  checked vs unchecked exceptions — compiler enforces checked; unchecked are silent
-  never swallow exceptions silently (empty catch block)
-  equals() and hashCode() always go together — break one, break both
-  == vs .equals() for Strings and objects
-  pass-by-value confusion (references are passed by value)
-  autoboxing surprises (Integer == Integer fails above 127)
-  final ≠ immutable
-
-Java concept map for reference:
-Tier 0 — JVM mental model
-  └─ bytecode, classloader, JIT, stack vs. heap
+Java concept reference — use this to identify what is most important in the source:
 
 Tier 1 — Type system
-  ├─ primitives vs. reference types
-  ├─ pass-by-value (including references)
-  └─ autoboxing / unboxing traps
+  primitives vs reference types | pass-by-value | autoboxing traps
 
 Tier 2 — OOP mechanics
-  ├─ constructors and this()
-  ├─ inheritance: extends, super(), method overriding, @Override
-  ├─ is-a (inheritance) vs has-a (composition)
-  ├─ what is and is not inherited (private, constructors)
-  ├─ method overloading vs overriding
-  └─ final: variable / method / class differences
+  constructors and this() | inheritance: extends / super() / @Override
+  is-a vs has-a | what is NOT inherited | overloading vs overriding | final
 
 Tier 3 — Contracts and polymorphism
-  ├─ interface as contract (implements, default, static methods)
-  ├─ interface vs abstract class — decision criteria
-  ├─ interface segregation (small, focused contracts)
-  ├─ Comparable and Iterable from the standard library
-  ├─ compile-time polymorphism (overloading)
-  ├─ runtime polymorphism (dynamic dispatch, @Override)
-  ├─ declaring variables by interface/superclass type
-  └─ instanceof — correct use and when it signals a design problem
+  interface as contract | interface vs abstract class | dynamic dispatch
+  compile-time vs runtime polymorphism | instanceof | Comparable / Iterable
 
 Tier 4 — Core contracts
-  ├─ equals() and hashCode() contract
-  ├─ == vs .equals() for Strings and objects
-  └─ Comparable vs Comparator
+  equals() and hashCode() | == vs .equals() | Comparable vs Comparator
 
 Tier 5 — Collections
-  ├─ List / Set / Map interfaces
-  ├─ ArrayList vs LinkedList
-  └─ HashMap internals (buckets, load factor)
+  List / Set / Map | ArrayList vs LinkedList | HashMap internals
 
 Tier 6 — Error handling
-  ├─ exception hierarchy: Throwable → Error / Exception → RuntimeException
-  ├─ checked vs unchecked exceptions
-  ├─ try-catch, finally, try-with-resources
-  ├─ throw vs throws
-  ├─ custom exception classes with domain context
-  └─ best practices: specific catches, fail fast, never swallow silently
-
-Tier 7 — Concurrency (advanced)
-  ├─ thread safety and shared state
-  ├─ synchronized and the monitor lock
-  └─ volatile and visibility
+  exception hierarchy | checked vs unchecked | try-catch / finally
+  throw vs throws | custom exceptions | never swallow silently
 
 Section summaries:
 {summaries}
 
 Respond with a raw JSON array only. No text outside the array. Each element must have:
-- concept (string)
+- concept (string) — the concept name, as a listener would hear it
 - source_sections (array of chunk IDs from the summaries above)
 - complexity (integer 1, 2, or 3)
-- key_facts (array of strings, 2–4 items)
-- common_misconception (string — the specific wrong belief a beginner forms)
-- good_analogy (string — a concrete analogy grounded in code reality, not a vague metaphor)
-- js_contrast (string — one sentence: "In JavaScript X; in Java Y" — or empty string if not applicable)
+- key_facts (array of 2–4 strings — the most important things to say about this concept)
+- common_misconception (string — the key insight that makes this concept click once you
+  truly understand it; the thing most explanations leave vague)
+- good_analogy (string — a concrete everyday analogy that works purely in spoken words;
+  no code, no symbols — something a non-programmer could picture)
+- js_contrast (string — "In JavaScript X; in Java Y" — empty string if not applicable)
 - question_style (string — one of: recall, error-spotting, judgment, predict-output, teach-back)
-- memory_hook (string — one memorable sentence the student must retain; if this concept is foundational for a later topic, say so)
-- prerequisite_concepts (array of strings, may be empty)
-- production_relevance (string — one sentence connecting this concept to real backend work: Spring Boot, REST APIs, database layers, or microservices)
+- memory_hook (string — one short, memorable sentence the listener will carry away)
+- prerequisite_concepts (array of strings — concepts from earlier units this one builds on)
+- production_relevance (string — one sentence grounding this in real backend work:
+  Spring Boot, REST APIs, databases, or microservices)

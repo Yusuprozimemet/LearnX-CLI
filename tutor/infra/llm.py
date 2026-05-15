@@ -69,6 +69,7 @@ def _build_client(provider: str, config: Config) -> OpenAI:
             api_key=config.openrouter_api_key,
             base_url="https://openrouter.ai/api/v1",
             default_headers={"HTTP-Referer": "http://localhost"},
+            timeout=120.0,
         )
     raise ConfigError(f"Unknown provider: {provider!r}. Use 'groq' or 'openrouter'.")
 
