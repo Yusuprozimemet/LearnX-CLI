@@ -99,7 +99,7 @@ Make sure the status bar shows **"Engine running"** before continuing.
 > Must be a real PowerShell window — not inside a Claude Code session.
 
 ```powershell
-cd C:\Users\HackYourFuture\yusup\LearnX-CLI
+cd C:\Users\yusup\LearnX-CLI
 .\.venv\Scripts\Activate.ps1
 ```
 
