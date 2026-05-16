@@ -102,6 +102,8 @@ VALID_VISUAL_TYPES: frozenset[str] = frozenset(
         "decision_guide",
         "key_insight",
         "memory_hook",
+        "step_sequence",
+        "callout",
     }
 )
 

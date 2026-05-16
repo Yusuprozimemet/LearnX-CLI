@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import logging
+
 from tutor.infra.llm import parse_json_response
 from tutor.models import VALID_VISUAL_TYPES, DialogueLine, SlideSegment
+
+log = logging.getLogger(__name__)
 
 
 def parse_segments_response(
@@ -57,23 +61,22 @@ def parse_segments_response(
             if not (isinstance(rows, list) and all(isinstance(r, list) for r in rows)):
                 rows = None
 
-        result.append(
-            SlideSegment(
-                unit_index=unit_index,
-                segment_index=0,
-                lines_start=ls,
-                lines_end=le,
-                visual_type=vtype,
-                title=title,
-                body=body,
-                code=code,
-                language=language,
-                mermaid=mermaid,
-                left=left,
-                right=right,
-                rows=rows,
-            )
+        seg = SlideSegment(
+            unit_index=unit_index,
+            segment_index=0,
+            lines_start=ls,
+            lines_end=le,
+            visual_type=vtype,
+            title=title,
+            body=body,
+            code=code,
+            language=language,
+            mermaid=mermaid,
+            left=left,
+            right=right,
+            rows=rows,
         )
+        result.append(_validate_segment(seg))
 
     if not result:
         return fallback_segments(unit_index, lines)
@@ -169,6 +172,26 @@ def fallback_segments(
 
 
 # ── private helpers ───────────────────────────────────────────────────────────
+
+
+def _validate_segment(seg: SlideSegment) -> SlideSegment:
+    """Post-process a segment: reclassify types that would produce blank slides."""
+    if seg.visual_type == "step_sequence" and not seg.body:
+        log.warning(
+            "segment %d-%d is step_sequence but body is empty — falling back to definition",
+            seg.lines_start,
+            seg.lines_end,
+        )
+        seg.visual_type = "definition"
+        seg.body = seg.title
+    if seg.visual_type == "callout" and not seg.body:
+        log.warning(
+            "segment %d-%d is callout but body is empty — falling back to key_insight",
+            seg.lines_start,
+            seg.lines_end,
+        )
+        seg.visual_type = "key_insight"
+    return seg
 
 
 def _make_segment(
