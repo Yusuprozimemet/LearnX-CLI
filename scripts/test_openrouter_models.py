@@ -49,9 +49,9 @@ MODELS = [
     "poolside/laguna-xs.2:free",
     "openai/gpt-oss-20b:free",
     "baidu/qianfan-cobuddy:free",
-    "arcee-ai/trinity-large-thinking:free",   # thinking model — may return empty content
+    "arcee-ai/trinity-large-thinking:free",  # thinking model — may return empty content
     "nvidia/nemotron-3-nano-omni:free",
-    "deepseek/deepseek-v4-flash:free",        # fast but known bad JSON
+    "deepseek/deepseek-v4-flash:free",  # fast but known bad JSON
     "google/gemma-4-31b-it:free",
     "nvidia/nemotron-nano-12b-2-vl:free",
     "nvidia/nemotron-nano-9b-v2:free",
@@ -81,6 +81,7 @@ Use only TUTOR and STUDENT as speakers, alternating, starting with TUTOR."""
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _call(model: str, prompt: str, max_tokens: int, temperature: float) -> tuple[str, float]:
     """Return (content, elapsed_s). Raises on API or empty-content errors."""
     t0 = time.time()
@@ -102,6 +103,7 @@ def _strip_fences(text: str) -> str:
 
 
 # ── Check functions ───────────────────────────────────────────────────────────
+
 
 def check_json(model: str) -> tuple[bool, float, str]:
     """(passed, elapsed_s, note)"""
@@ -133,10 +135,7 @@ def check_dialogue(model: str) -> tuple[bool, float, str]:
         if not content:
             return False, elapsed, "empty response"
         lines = [ln.strip() for ln in content.splitlines() if ln.strip()]
-        speaker_lines = [
-            ln for ln in lines
-            if re.match(r"^(TUTOR|STUDENT)\s*:", ln, re.IGNORECASE)
-        ]
+        speaker_lines = [ln for ln in lines if re.match(r"^(TUTOR|STUDENT)\s*:", ln, re.IGNORECASE)]
         if len(speaker_lines) < 2:
             return False, elapsed, f"only {len(speaker_lines)} speaker line(s) found"
         return True, elapsed, f"{len(speaker_lines)} lines"
@@ -156,7 +155,9 @@ FAIL = "FAIL"
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--quick", action="store_true", help="JSON check only")
     parser.add_argument("--model", help="Test a single model slug")
     args = parser.parse_args()

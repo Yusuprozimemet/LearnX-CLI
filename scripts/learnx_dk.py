@@ -22,6 +22,7 @@ Examples:
 import json
 import os
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -36,19 +37,28 @@ MODES = ("supervised", "assisted", "container", "yolo")
 
 BANNER = {
     "supervised": "SUPERVISED  — host machine, deny rules active, prompts on risky ops",
-    "assisted":   "ASSISTED    — host machine, no deny rules, prompts only for push/merge",
-    "container":  "CONTAINER   — Docker, --dangerously-skip-permissions, zero prompts",
-    "yolo":       "YOLO        — Docker + auto E2E + auto review after session ends",
+    "assisted": "ASSISTED    — host machine, no deny rules, prompts only for push/merge",
+    "container": "CONTAINER   — Docker, --dangerously-skip-permissions, zero prompts",
+    "yolo": "YOLO        — Docker + auto E2E + auto review after session ends",
 }
 
 ASSISTED_PERMISSIONS = {
     "permissions": {
         "allow": [
-            "Bash(py -m pytest*)", "Bash(py -m ruff*)", "Bash(python*)",
-            "Bash(git status*)", "Bash(git diff*)", "Bash(git log*)",
-            "Bash(git add*)", "Bash(git commit*)", "Bash(git checkout*)",
-            "Bash(git branch*)", "Bash(git stash*)",
-            "Read(*)", "Edit(*)", "Write(*)",
+            "Bash(py -m pytest*)",
+            "Bash(py -m ruff*)",
+            "Bash(python*)",
+            "Bash(git status*)",
+            "Bash(git diff*)",
+            "Bash(git log*)",
+            "Bash(git add*)",
+            "Bash(git commit*)",
+            "Bash(git checkout*)",
+            "Bash(git branch*)",
+            "Bash(git stash*)",
+            "Read(*)",
+            "Edit(*)",
+            "Write(*)",
         ]
     }
 }
@@ -80,8 +90,12 @@ def build_docker_command(
     gitconfig = home_dir / ".gitconfig"
 
     cmd = [
-        "docker", "run", "--rm", "-it",
-        "-v", f"{_to_posix(project_dir)}:{WORKSPACE}",
+        "docker",
+        "run",
+        "--rm",
+        "-it",
+        "-v",
+        f"{_to_posix(project_dir)}:{WORKSPACE}",
     ]
     if claude_dir.exists():
         cmd += ["-v", f"{_to_posix(claude_dir)}:/home/dev/.claude:ro"]
@@ -92,8 +106,7 @@ def build_docker_command(
     if gitconfig.exists():
         cmd += ["-v", f"{_to_posix(gitconfig)}:/home/dev/.gitconfig:ro"]
 
-    for var in ("GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL",
-                "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL"):
+    for var in ("GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL"):
         if var in os.environ:
             cmd += ["-e", f"{var}={os.environ[var]}"]
 
@@ -117,6 +130,7 @@ def build_command(
 
 
 # ── mode runners ─────────────────────────────────────────────────────────────
+
 
 def run_supervised(extra_args: list[str], dry_run: bool) -> None:
     cmd = build_host_command(extra_args)
@@ -157,11 +171,19 @@ def run_container(
 def _build_e2e_command(project_dir: pathlib.Path) -> list[str]:
     """Run E2E tests inside the container — ffmpeg, Playwright, and chromium are there."""
     return [
-        "docker", "run", "--rm",
-        "-v", f"{_to_posix(project_dir)}:{WORKSPACE}",
-        "-w", WORKSPACE,
+        "docker",
+        "run",
+        "--rm",
+        "-v",
+        f"{_to_posix(project_dir)}:{WORKSPACE}",
+        "-w",
+        WORKSPACE,
         IMAGE,
-        "python", "-m", "pytest", "tutor/tests/e2e/", "-v",
+        "python",
+        "-m",
+        "pytest",
+        "tutor/tests/e2e/",
+        "-v",
     ]
 
 
@@ -200,44 +222,106 @@ def run_yolo(
         print("\n[yolo] WARNING: E2E tests had failures — review findings carefully")
 
 
+# ── version-level execution ──────────────────────────────────────────────────
+
+
+def _discover_specs(specs_dir: pathlib.Path, version: str) -> list[pathlib.Path]:
+    """Return spec .md files in specs/{version}/ sorted by embedded day number."""
+    version_dir = specs_dir / version
+    if not version_dir.is_dir():
+        print(f"error: specs directory not found: {version_dir}")
+        sys.exit(1)
+    files = list(version_dir.glob("*.md"))
+
+    def _key(p: pathlib.Path) -> tuple[int, str]:
+        m = re.search(r"(\d+)", p.stem)
+        return (int(m.group(1)) if m else 0, p.stem)
+
+    return sorted(files, key=_key)
+
+
+def run_yolo_version(
+    project_dir: pathlib.Path,
+    home_dir: pathlib.Path,
+    version: str,
+    extra_args: list[str],
+    dry_run: bool,
+) -> None:
+    specs_dir = project_dir / "specs"
+    specs = _discover_specs(specs_dir, version)
+    if not specs:
+        print(f"[version] no spec files found in specs/{version}/")
+        return
+
+    print(f"\n[version] {version} - {len(specs)} spec(s) found")
+    for spec in specs:
+        print(f"\n[version] -- spec: {spec.name} --")
+        run_yolo(project_dir, home_dir, spec_path=spec, extra_args=extra_args, dry_run=dry_run)
+
+
 # ── CLI ──────────────────────────────────────────────────────────────────────
 
-def _parse(argv: list[str]) -> tuple[str, bool, pathlib.Path | None, list[str]]:
+
+def _parse(argv: list[str]) -> tuple[str, bool, pathlib.Path | None, str | None, list[str]]:
     mode = "supervised"
     dry_run = False
     spec = None
+    version: str | None = None
     rest: list[str] = []
 
     i = 0
     while i < len(argv):
         arg = argv[i]
         if arg == "--mode" and i + 1 < len(argv):
-            mode = argv[i + 1]; i += 2
+            mode = argv[i + 1]
+            i += 2
         elif arg.startswith("--mode="):
-            mode = arg.split("=", 1)[1]; i += 1
+            mode = arg.split("=", 1)[1]
+            i += 1
         elif arg == "--dry-run":
-            dry_run = True; i += 1
+            dry_run = True
+            i += 1
         elif arg == "--spec" and i + 1 < len(argv):
-            spec = pathlib.Path(argv[i + 1]); i += 2
+            spec = pathlib.Path(argv[i + 1])
+            i += 2
         elif arg.startswith("--spec="):
-            spec = pathlib.Path(arg.split("=", 1)[1]); i += 1
+            spec = pathlib.Path(arg.split("=", 1)[1])
+            i += 1
+        elif arg == "--version" and i + 1 < len(argv):
+            version = argv[i + 1]
+            i += 2
+        elif arg.startswith("--version="):
+            version = arg.split("=", 1)[1]
+            i += 1
         else:
-            rest.append(arg); i += 1
+            rest.append(arg)
+            i += 1
 
     if mode not in MODES:
         print(f"error: unknown mode '{mode}'. choose from: {', '.join(MODES)}")
         sys.exit(1)
 
-    return mode, dry_run, spec, rest
+    if spec is not None and version is not None:
+        print("error: --version and --spec are mutually exclusive")
+        sys.exit(1)
+
+    if version is not None:
+        mode = "yolo"
+
+    return mode, dry_run, spec, version, rest
 
 
 def main(argv: list[str] | None = None) -> None:
     if argv is None:
         argv = sys.argv[1:]
 
-    mode, dry_run, spec, extra = _parse(argv)
+    mode, dry_run, spec, version, extra = _parse(argv)
     project_dir = pathlib.Path.cwd()
     home_dir = pathlib.Path.home()
+
+    if version:
+        run_yolo_version(project_dir, home_dir, version, extra, dry_run)
+        return
 
     if not dry_run:
         _print_banner(mode)

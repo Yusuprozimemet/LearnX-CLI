@@ -49,7 +49,9 @@ def test_agent_frontmatter_has_name_and_description():
 def test_agent_name_matches_filename():
     for name in AGENT_NAMES:
         fm, _ = _parse_frontmatter(AGENTS_DIR / f"{name}.md")
-        assert fm["name"] == name, f"{name}.md: frontmatter name '{fm['name']}' != filename '{name}'"
+        assert fm["name"] == name, (
+            f"{name}.md: frontmatter name '{fm['name']}' != filename '{name}'"
+        )
 
 
 def test_agent_body_is_nonempty():
@@ -93,9 +95,11 @@ def test_review_command_with_spec_includes_spec_path(dirs):
 
 
 def test_review_dry_run_does_not_call_subprocess(dirs, capsys):
-    with patch("scripts.run_review.pathlib.Path.cwd", return_value=dirs[0]), \
-         patch("scripts.run_review.pathlib.Path.home", return_value=dirs[1]), \
-         patch("scripts.run_review.subprocess.run") as mock_run:
+    with (
+        patch("scripts.run_review.pathlib.Path.cwd", return_value=dirs[0]),
+        patch("scripts.run_review.pathlib.Path.home", return_value=dirs[1]),
+        patch("scripts.run_review.subprocess.run") as mock_run,
+    ):
         main(["--dry-run"])
     mock_run.assert_not_called()
 
