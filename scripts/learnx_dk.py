@@ -25,8 +25,19 @@ import pathlib
 import re
 import subprocess
 import sys
+import time
+from dataclasses import dataclass
 
 _PY = sys.executable  # venv-aware Python for host post-container steps
+
+
+@dataclass
+class SpecResult:
+    spec_name: str
+    status: str  # "DONE" | "FAILED"
+    duration_s: float
+    branch: str
+
 
 # ── constants ────────────────────────────────────────────────────────────────
 
@@ -240,6 +251,51 @@ def _discover_specs(specs_dir: pathlib.Path, version: str) -> list[pathlib.Path]
     return sorted(files, key=_key)
 
 
+def _spec_branch_name(version: str, spec_stem: str) -> str:
+    """Return the sandbox branch name for one spec in a version run."""
+    return f"sandbox/{version}-{spec_stem}"
+
+
+def _checkout_spec_branch(branch: str, dry_run: bool) -> bool:
+    """Checkout main then create a fresh branch for this spec.
+
+    Returns True if all git commands succeeded, False otherwise.
+    """
+    cmds = [
+        ["git", "checkout", "main"],
+        ["git", "checkout", "-b", branch],
+    ]
+    if dry_run:
+        for cmd in cmds:
+            print(" ".join(cmd))
+        return True
+    for cmd in cmds:
+        result = subprocess.run(cmd, check=False)
+        if result.returncode != 0:
+            print(f"[version] error: '{' '.join(cmd)}' exited {result.returncode}")
+            return False
+    return True
+
+
+def _print_version_report(results: list[SpecResult], version: str) -> None:
+    width = 60
+    print(f"\n{'-' * width}")
+    print(f"  {version} Execution Summary")
+    print(f"{'-' * width}")
+    for r in results:
+        icon = "✓" if r.status == "DONE" else "✗"
+        mins = int(r.duration_s / 60)
+        print(f"  {r.spec_name:<12}  {icon} {r.status:<8}  {mins} min")
+    print(f"{'-' * width}")
+    total_mins = int(sum(r.duration_s for r in results) / 60)
+    done = sum(1 for r in results if r.status == "DONE")
+    failed = len(results) - done
+    print(
+        f"  {len(results)}/{len(results)} specs attempted · "
+        f"{done} done · {failed} failed · Total: {total_mins} min"
+    )
+
+
 def run_yolo_version(
     project_dir: pathlib.Path,
     home_dir: pathlib.Path,
@@ -254,9 +310,23 @@ def run_yolo_version(
         return
 
     print(f"\n[version] {version} - {len(specs)} spec(s) found")
+    results: list[SpecResult] = []
+
     for spec in specs:
-        print(f"\n[version] -- spec: {spec.name} --")
+        branch = _spec_branch_name(version, spec.stem)
+        print(f"\n[version] -- spec: {spec.name}  branch: {branch} --")
+
+        t0 = time.monotonic()
+        if not _checkout_spec_branch(branch, dry_run):
+            duration_s = time.monotonic() - t0
+            results.append(SpecResult(spec.stem, "FAILED", duration_s, branch))
+            continue
         run_yolo(project_dir, home_dir, spec_path=spec, extra_args=extra_args, dry_run=dry_run)
+        duration_s = time.monotonic() - t0
+
+        results.append(SpecResult(spec.stem, "DONE", duration_s, branch))
+
+    _print_version_report(results, version)
 
 
 # ── CLI ──────────────────────────────────────────────────────────────────────
@@ -314,6 +384,12 @@ def _parse(argv: list[str]) -> tuple[str, bool, pathlib.Path | None, str | None,
 def main(argv: list[str] | None = None) -> None:
     if argv is None:
         argv = sys.argv[1:]
+    # Ensure Unicode output works on Windows terminals (cp1252 → utf-8)
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
 
     mode, dry_run, spec, version, extra = _parse(argv)
     project_dir = pathlib.Path.cwd()
