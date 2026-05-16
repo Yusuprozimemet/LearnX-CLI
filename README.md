@@ -1,6 +1,7 @@
 # LearnX
 
 ![CI](https://github.com/Yusuprozimemet/LearnX-CLI/actions/workflows/ci.yml/badge.svg)
+[![PyPI](https://img.shields.io/pypi/v/learnx-cli.svg)](https://pypi.org/project/learnx-cli/)
 
 Turn any Markdown document into an audio tutorial and MP4 video from a terminal shell.
 
