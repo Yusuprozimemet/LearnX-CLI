@@ -228,7 +228,8 @@ def main(argv: list[str] | None = None) -> None:
         argv = sys.argv[1:]
 
     dry_run = "--dry-run" in argv
-    remaining = [a for a in argv if a != "--dry-run"]
+    no_two_phase = "--no-two-phase" in argv
+    remaining = [a for a in argv if a not in ("--dry-run", "--no-two-phase")]
 
     spec_path: pathlib.Path | None = None
     if "--spec" in remaining:
@@ -248,17 +249,33 @@ def main(argv: list[str] | None = None) -> None:
     project_dir = pathlib.Path.cwd()
     home_dir = pathlib.Path.home()
 
+    config = _load_config(project_dir)
     if agents_dir is None:
-        config = _load_config(project_dir)
         agents_dir = config["review"]["agents_dir"]
 
-    cmd = build_review_command(project_dir, home_dir, spec_path, remaining, agents_dir=agents_dir)
+    two_phase = config["review"].get("two_phase", True) and not no_two_phase
 
     if dry_run:
+        cmd = build_review_command(
+            project_dir, home_dir, spec_path, remaining, agents_dir=agents_dir
+        )
         print(" ".join(cmd))
+        if two_phase:
+            print("# [two-phase] phase 2 would run if phase 1 finds issues")
         return
 
-    subprocess.run(cmd, check=False)
+    print("\n── Phase 1 (issue discovery) ──")
+    _rc1, phase1_output, had_findings = run_phase1(
+        project_dir, home_dir, spec_path, agents_dir, remaining
+    )
+
+    if two_phase and had_findings:
+        print("\n── Phase 2 (fix verification) ──")
+        run_phase2(project_dir, home_dir, phase1_output, agents_dir, remaining)
+    elif two_phase and not had_findings:
+        print("\n[review] phase 1 clean — skipping phase 2")
+    else:
+        print("\n[review] two-phase disabled — phase 1 only")
 
 
 if __name__ == "__main__":
