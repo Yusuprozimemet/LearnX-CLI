@@ -141,6 +141,7 @@ def run_explore(extra_args: list[str], dry_run: bool) -> None:
         print(" ".join(cmd))
         print(f"[deletes {SETTINGS_LOCAL}]")
         return
+    SETTINGS_LOCAL.parent.mkdir(parents=True, exist_ok=True)
     SETTINGS_LOCAL.write_text(json.dumps(EXPLORE_PERMISSIONS, indent=2))
     try:
         subprocess.run(cmd, check=False)

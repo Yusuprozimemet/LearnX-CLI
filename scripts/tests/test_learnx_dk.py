@@ -144,6 +144,15 @@ def test_implement_review_dry_run_with_spec(dirs, capsys):
     assert "day1.md" in out
 
 
+def test_explore_writes_settings_local_when_claude_dir_absent(tmp_path, monkeypatch):
+    """run_explore() must not raise FileNotFoundError on a fresh clone."""
+    local = tmp_path / ".claude" / "settings.local.json"
+    monkeypatch.setattr("scripts.learnx_dk.SETTINGS_LOCAL", local)
+    with patch("scripts.learnx_dk.subprocess.run"):
+        run_explore([], dry_run=False)
+    assert not local.exists()  # cleaned up on exit
+
+
 def test_explore_dry_run_runs_on_host(capsys):
     """--explore outputs a host claude command, not docker."""
     run_explore([], dry_run=True)
