@@ -113,6 +113,9 @@ def main(argv: list[str] | None = None) -> None:
     agents_dir: str | None = None
     if "--agents-dir" in remaining:
         idx = remaining.index("--agents-dir")
+        if idx + 1 >= len(remaining):
+            print("error: --agents-dir requires a value")
+            sys.exit(1)
         agents_dir = remaining[idx + 1]
         remaining = remaining[:idx] + remaining[idx + 2 :]
 

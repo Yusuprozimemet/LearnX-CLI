@@ -146,7 +146,11 @@ def _build_e2e_command(
     workspace: str = WORKSPACE,
 ) -> list[str]:
     """Build docker run command that executes e2e_cmd inside the container."""
-    inner = shlex.split(e2e_cmd)
+    try:
+        inner = shlex.split(e2e_cmd)
+    except ValueError as exc:
+        print(f"error: invalid e2e_tests command in config: {exc}")
+        sys.exit(1)
     return [
         "docker",
         "run",
@@ -201,9 +205,11 @@ def run_implement(
     workspace: str = WORKSPACE,
     config: dict | None = None,
 ) -> None:
-    cfg = config or _DEFAULTS
-    e2e_cmd = cfg["validation"]["e2e_tests"]
-    review_script = cfg["review"]["review_script"]
+    cfg = config or {}
+    e2e_cmd = cfg.get("validation", {}).get("e2e_tests") or _DEFAULTS["validation"]["e2e_tests"]
+    review_script = (
+        cfg.get("review", {}).get("review_script") or _DEFAULTS["review"]["review_script"]
+    )
 
     container_cmd = build_docker_command(
         project_dir, home_dir, extra_args, image=image, workspace=workspace

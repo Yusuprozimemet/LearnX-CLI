@@ -143,3 +143,13 @@ def test_review_main_dry_run_accepts_agents_dir_flag(dirs, capsys):
     out = capsys.readouterr().out
     assert "my/agents" in out
     mock_run.assert_not_called()
+
+
+def test_review_agents_dir_missing_value_exits(dirs):
+    with (
+        patch("scripts.run_review.pathlib.Path.cwd", return_value=dirs[0]),
+        patch("scripts.run_review.pathlib.Path.home", return_value=dirs[1]),
+    ):
+        with pytest.raises(SystemExit) as exc:
+            main(["--agents-dir"])
+    assert exc.value.code == 1

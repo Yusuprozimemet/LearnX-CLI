@@ -134,6 +134,22 @@ def test_run_implement_review_dry_run_uses_config_review_script(dirs, capsys):
     assert "custom_review.py" in out
 
 
+def test_build_e2e_command_exits_on_malformed_cmd(dirs):
+    project, _ = dirs
+    with pytest.raises(SystemExit) as exc:
+        _build_e2e_command(project, e2e_cmd="bad 'unbalanced")
+    assert exc.value.code == 1
+
+
+def test_run_implement_partial_config_falls_back_to_defaults(dirs, capsys):
+    project, home = dirs
+    # config is missing 'review' section entirely
+    config = {"validation": {"e2e_tests": "python -m pytest tutor/tests/e2e/ -v"}}
+    run_implement(project, home, spec=None, review=True, extra_args=[], dry_run=True, config=config)
+    out = capsys.readouterr().out
+    assert "run_review.py" in out  # fell back to _DEFAULTS["review"]["review_script"]
+
+
 def test_build_docker_command_uses_custom_image(dirs):
     project, home = dirs
     cmd = build_docker_command(project, home, extra_args=[], image="my-img", workspace="/app")
