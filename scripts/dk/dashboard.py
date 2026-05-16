@@ -33,6 +33,12 @@ DASHBOARD_HTML = """\
   <h3>Live output</h3>
   <div id="output"></div>
   <script>
+    function makeCell(text, cls) {
+      var td = document.createElement("td");
+      td.textContent = text;
+      if (cls) td.className = cls;
+      return td;
+    }
     var es = new EventSource("/stream");
     es.onmessage = function(e) {
       var d = JSON.parse(e.data);
@@ -41,14 +47,16 @@ DASHBOARD_HTML = """\
       d.results.forEach(function(r) {
         var cls = r.status.toLowerCase().replace(/ /g,"_");
         var tr = document.createElement("tr");
-        tr.innerHTML = "<td>"+r.spec+"</td><td class='"+cls+"'>"+r.status+
-          "</td><td>"+Math.round(r.duration_s/60)+" min</td><td>"+r.branch+"</td>";
+        [makeCell(r.spec), makeCell(r.status, cls),
+         makeCell(Math.round(r.duration_s/60)+" min"), makeCell(r.branch)
+        ].forEach(function(td) { tr.appendChild(td); });
         tbody.appendChild(tr);
       });
       if (d.current_spec) {
         var tr = document.createElement("tr");
-        tr.innerHTML = "<td>"+d.current_spec+
-          "</td><td class='in_progress'>► IN PROGRESS</td><td>—</td><td>—</td>";
+        [makeCell(d.current_spec), makeCell("► IN PROGRESS", "in_progress"),
+         makeCell("—"), makeCell("—")
+        ].forEach(function(td) { tr.appendChild(td); });
         tbody.appendChild(tr);
       }
       var out = document.getElementById("output");
@@ -85,6 +93,52 @@ class OutputBuffer:
             return list(self._lines)
 
 
+def _make_handler(server: "DashboardServer") -> type:
+    """Return a BaseHTTPRequestHandler subclass bound to the given server."""
+
+    class _Handler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, fmt: str, *args: object) -> None:
+            pass
+
+        def do_GET(self) -> None:  # type: ignore[override]
+            action = {
+                "/": self._serve_html,
+                "/status": self._serve_json,
+                "/stream": self._serve_sse,
+            }.get(self.path)
+            if action:
+                action()
+            else:
+                self.send_error(404)
+
+        def _send_body(self, body: bytes, content_type: str) -> None:
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def _serve_html(self) -> None:
+            self._send_body(DASHBOARD_HTML.encode(), "text/html; charset=utf-8")
+
+        def _serve_json(self) -> None:
+            self._send_body(_json.dumps(server._snapshot()).encode(), "application/json")
+
+        def _serve_sse(self) -> None:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            try:
+                data = _json.dumps(server._snapshot())
+                self.wfile.write(f"data: {data}\n\n".encode())
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
+    return _Handler
+
+
 class DashboardServer:
     """
     Background HTTP server for the live progress dashboard.
@@ -103,58 +157,14 @@ class DashboardServer:
         self._server: http.server.HTTPServer | None = None
         self._thread: threading.Thread | None = None
 
+    def _snapshot(self) -> dict:
+        with self._lock:
+            state = dict(self._state)
+        state["recent_output"] = self._buffer.lines()
+        return state
+
     def start(self) -> None:
-        server_self = self
-
-        class _Handler(http.server.BaseHTTPRequestHandler):
-            def log_message(self, fmt: str, *args: object) -> None:
-                pass  # suppress per-request log lines
-
-            def do_GET(self) -> None:  # type: ignore[override]
-                if self.path == "/":
-                    self._serve_html()
-                elif self.path == "/status":
-                    self._serve_json()
-                elif self.path == "/stream":
-                    self._serve_sse()
-                else:
-                    self.send_error(404)
-
-            def _snapshot(self) -> dict:
-                with server_self._lock:
-                    state = dict(server_self._state)
-                state["recent_output"] = server_self._buffer.lines()
-                return state
-
-            def _serve_html(self) -> None:
-                body = DASHBOARD_HTML.encode()
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-
-            def _serve_json(self) -> None:
-                body = _json.dumps(self._snapshot()).encode()
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-
-            def _serve_sse(self) -> None:
-                self.send_response(200)
-                self.send_header("Content-Type", "text/event-stream")
-                self.send_header("Cache-Control", "no-cache")
-                self.end_headers()
-                try:
-                    data = _json.dumps(self._snapshot())
-                    self.wfile.write(f"data: {data}\n\n".encode())
-                    self.wfile.flush()
-                except (BrokenPipeError, ConnectionResetError):
-                    pass
-
-        self._server = http.server.HTTPServer(("", self._port), _Handler)
+        self._server = http.server.HTTPServer(("", self._port), _make_handler(self))
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
         self._thread.start()
         print(f"[dashboard] serving at http://localhost:{self._port}", flush=True)

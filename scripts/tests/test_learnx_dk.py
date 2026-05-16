@@ -1,13 +1,15 @@
 import http.client
 import json
-import random
+import socket
 import threading
 
 from scripts.learnx_dk import DashboardServer, OutputBuffer, SpecResult
 
 
 def _free_port() -> int:
-    return random.randint(18000, 19999)
+    with socket.socket() as s:
+        s.bind(("", 0))
+        return s.getsockname()[1]
 
 
 def test_output_buffer_append_and_lines():
