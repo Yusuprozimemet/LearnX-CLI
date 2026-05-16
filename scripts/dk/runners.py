@@ -199,7 +199,7 @@ def run_yolo_version(
     _notified = [False]
 
     def _atexit_handler() -> None:
-        if _notified[0] or not notifier.enabled():
+        if _notified[0] or dry_run or not notifier.enabled():
             return
         payload = _build_notify_payload(version, results, "aborted", start_time, cfg)
         notifier.send(payload)
@@ -283,7 +283,7 @@ def run_yolo_version(
 
     _print_version_report(results, version)
 
-    if notifier.enabled():
+    if notifier.enabled() and not dry_run:
         payload = _build_notify_payload(version, results, "completed", start_time, cfg)
         notifier.send(payload)
         _notified[0] = True

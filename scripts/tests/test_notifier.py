@@ -232,3 +232,43 @@ def test_atexit_handler_sends_aborted_when_not_notified(tmp_path, dirs):
         mock_open.assert_called_once()
         payload = json.loads(mock_open.call_args[0][0].data)
         assert payload["status"] == "aborted"
+
+
+def test_completion_notification_skipped_in_dry_run(tmp_path, dirs):
+    """dry_run=True must not send a completion notification."""
+    project, home = dirs
+    ver_dir = tmp_path / "specs" / "v5"
+    ver_dir.mkdir(parents=True)
+    (ver_dir / "day1.md").write_text("# day1")
+
+    cfg = {**_DEFAULTS, "notify": {"webhook_url": "https://example.com/hook"}}
+
+    with patch("scripts.dk.notifier.urllib.request.urlopen") as mock_open:
+        run_yolo_version(
+            tmp_path, home, "v5", review=False, extra_args=[], dry_run=True, config=cfg
+        )
+
+    mock_open.assert_not_called()
+
+
+def test_atexit_handler_skipped_in_dry_run(tmp_path, dirs):
+    """atexit handler must not send an abort notification when dry_run=True."""
+    project, home = dirs
+    ver_dir = tmp_path / "specs" / "v5"
+    ver_dir.mkdir(parents=True)
+    (ver_dir / "day1.md").write_text("# day1")
+
+    cfg = {**_DEFAULTS, "notify": {"webhook_url": "https://example.com/hook"}}
+    captured_handler = []
+
+    with (
+        patch("atexit.register", side_effect=lambda fn: captured_handler.append(fn)),
+        patch("scripts.dk.notifier.urllib.request.urlopen") as mock_open,
+    ):
+        run_yolo_version(
+            tmp_path, home, "v5", review=False, extra_args=[], dry_run=True, config=cfg
+        )
+
+        assert len(captured_handler) == 1
+        captured_handler[0]()
+        mock_open.assert_not_called()
