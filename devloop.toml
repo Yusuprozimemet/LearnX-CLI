@@ -1,0 +1,18 @@
+# devloop.toml — project config for the learnx_dk.py dev loop
+# Edit this file to adapt the loop to a different project.
+
+[project]
+name = "LearnX"
+docker_image = "learnx-dev"
+specs_dir = "specs"
+workspace = "/workspace"
+
+[validation]
+unit_tests = "python -m pytest tutor/tests/ --ignore=tutor/tests/e2e/ -m 'not slow' -v"
+e2e_tests = "python -m pytest tutor/tests/e2e/ -v"
+lint = "python -m ruff check tutor/"
+format_check = "python -m ruff format --check tutor/"
+
+[review]
+agents_dir = ".claude/agents"
+review_script = "scripts/run_review.py"

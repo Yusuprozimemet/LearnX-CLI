@@ -26,9 +26,42 @@ import re
 import subprocess
 import sys
 import time
+import tomllib
 from dataclasses import dataclass
 
 _PY = sys.executable  # venv-aware Python for host post-container steps
+
+_DEFAULTS: dict = {
+    "project": {
+        "name": "LearnX",
+        "docker_image": "learnx-dev",
+        "specs_dir": "specs",
+        "workspace": "/workspace",
+    },
+    "validation": {
+        "unit_tests": "python -m pytest tutor/tests/ --ignore=tutor/tests/e2e/ -m 'not slow' -v",
+        "e2e_tests": "python -m pytest tutor/tests/e2e/ -v",
+        "lint": "python -m ruff check tutor/",
+        "format_check": "python -m ruff format --check tutor/",
+    },
+    "review": {
+        "agents_dir": ".claude/agents",
+        "review_script": "scripts/run_review.py",
+    },
+}
+
+
+def _load_config(project_dir: pathlib.Path) -> dict:
+    """Load devloop.toml from project_dir; fall back to _DEFAULTS if absent."""
+    config_path = project_dir / "devloop.toml"
+    if not config_path.exists():
+        return _DEFAULTS
+    with open(config_path, "rb") as fh:
+        raw = tomllib.load(fh)
+    config: dict = {}
+    for section, defaults in _DEFAULTS.items():
+        config[section] = {**defaults, **raw.get(section, {})}
+    return config
 
 
 @dataclass
@@ -71,6 +104,8 @@ def build_docker_command(
     project_dir: pathlib.Path,
     home_dir: pathlib.Path,
     extra_args: list[str],
+    image: str = IMAGE,
+    workspace: str = WORKSPACE,
 ) -> list[str]:
     """Build the docker run command."""
     claude_dir = home_dir / ".claude"
@@ -83,7 +118,7 @@ def build_docker_command(
         "--rm",
         "-it",
         "-v",
-        f"{_to_posix(project_dir)}:{WORKSPACE}",
+        f"{_to_posix(project_dir)}:{workspace}",
     ]
     if claude_dir.exists():
         cmd += ["-v", f"{_to_posix(claude_dir)}:/home/dev/.claude:ro"]
@@ -98,7 +133,7 @@ def build_docker_command(
         if var in os.environ:
             cmd += ["-e", f"{var}={os.environ[var]}"]
 
-    cmd += ["-w", WORKSPACE, IMAGE]
+    cmd += ["-w", workspace, image]
     cmd += ["claude", "--dangerously-skip-permissions"] + extra_args
     return cmd
 
@@ -126,8 +161,10 @@ def build_command(
     project_dir: pathlib.Path,
     home_dir: pathlib.Path,
     extra_args: list[str],
+    image: str = IMAGE,
+    workspace: str = WORKSPACE,
 ) -> list[str]:
-    return build_docker_command(project_dir, home_dir, extra_args)
+    return build_docker_command(project_dir, home_dir, extra_args, image, workspace)
 
 
 # ── runners ──────────────────────────────────────────────────────────────────
@@ -157,8 +194,10 @@ def run_implement(
     review: bool,
     extra_args: list[str],
     dry_run: bool,
+    image: str = IMAGE,
+    workspace: str = WORKSPACE,
 ) -> None:
-    container_cmd = build_docker_command(project_dir, home_dir, extra_args)
+    container_cmd = build_docker_command(project_dir, home_dir, extra_args, image=image, workspace=workspace)
 
     if dry_run:
         print("# Step 1 — container session")
@@ -261,11 +300,11 @@ def run_yolo_version(
     review: bool,
     extra_args: list[str],
     dry_run: bool,
+    specs_dir: str = "specs",
 ) -> None:
-    specs_dir = project_dir / "specs"
-    specs = _discover_specs(specs_dir, version)
+    specs = _discover_specs(project_dir / specs_dir, version)
     if not specs:
-        print(f"[version] no spec files found in specs/{version}/")
+        print(f"[version] no spec files found in {specs_dir}/{version}/")
         return
 
     print(f"\n[version] {version} - {len(specs)} spec(s) found")
@@ -359,16 +398,26 @@ def main(argv: list[str] | None = None) -> None:
     explore, review, dry_run, spec, version, extra = _parse(argv)
     project_dir = pathlib.Path.cwd()
     home_dir = pathlib.Path.home()
+    config = _load_config(project_dir)
+
+    proj = config["project"]
+    image = proj["docker_image"]
+    workspace = proj["workspace"]
+    specs_dir = proj["specs_dir"]
 
     if explore:
         run_explore(extra, dry_run)
         return
 
     if version:
-        run_yolo_version(project_dir, home_dir, version, review, extra, dry_run)
+        run_yolo_version(
+            project_dir, home_dir, version, review, extra, dry_run,
+            specs_dir=specs_dir,
+        )
         return
 
-    run_implement(project_dir, home_dir, spec, review, extra, dry_run)
+    run_implement(project_dir, home_dir, spec, review, extra, dry_run,
+                  image=image, workspace=workspace)
 
 
 if __name__ == "__main__":

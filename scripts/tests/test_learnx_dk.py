@@ -8,10 +8,12 @@ from scripts.learnx_dk import (
     SpecResult,
     _checkout_spec_branch,
     _discover_specs,
+    _load_config,
     _parse,
     _print_version_report,
     _spec_branch_name,
     build_command,
+    build_docker_command,
     main,
     run_explore,
     run_implement,
@@ -87,6 +89,40 @@ def test_extra_args_forwarded_to_claude(dirs):
     tail = cmd[claude_idx:]
     assert "--model" in tail
     assert "opus" in tail
+
+
+# ── Day 22 (v7) tests ────────────────────────────────────────────────────────
+
+
+def test_load_config_returns_defaults_when_toml_missing(tmp_path):
+    config = _load_config(tmp_path)
+    assert config["project"]["docker_image"] == "learnx-dev"
+    assert config["project"]["workspace"] == "/workspace"
+    assert config["review"]["review_script"] == "scripts/run_review.py"
+
+
+def test_load_config_reads_docker_image_from_toml(tmp_path):
+    (tmp_path / "devloop.toml").write_text(
+        '[project]\ndocker_image = "custom-image"\n'
+    )
+    config = _load_config(tmp_path)
+    assert config["project"]["docker_image"] == "custom-image"
+
+
+def test_load_config_merges_missing_keys_with_defaults(tmp_path):
+    (tmp_path / "devloop.toml").write_text(
+        '[project]\ndocker_image = "custom-image"\n'
+    )
+    config = _load_config(tmp_path)
+    assert config["project"]["workspace"] == "/workspace"
+
+
+def test_build_docker_command_uses_custom_image(dirs):
+    project, home = dirs
+    cmd = build_docker_command(project, home, extra_args=[], image="my-img", workspace="/app")
+    assert "my-img" in cmd
+    mounts = [cmd[i + 1] for i, a in enumerate(cmd) if a == "-v"]
+    assert any("/app" in m for m in mounts)
 
 
 # ── Day 20 (v6) tests ────────────────────────────────────────────────────────
