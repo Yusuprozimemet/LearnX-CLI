@@ -200,6 +200,18 @@ def test_parse_version_flag():
     assert version == "v5"
 
 
+def test_version_normalizes_mode_to_yolo():
+    mode, _, _, version, _ = _parse(["--mode", "supervised", "--version", "v5"])
+    assert version == "v5"
+    assert mode == "yolo"
+
+
+def test_version_without_mode_normalizes_to_yolo():
+    mode, _, _, version, _ = _parse(["--version", "v5"])
+    assert version == "v5"
+    assert mode == "yolo"
+
+
 def test_parse_version_equals_form():
     _, _, _, version, _ = _parse(["--version=v5"])
     assert version == "v5"

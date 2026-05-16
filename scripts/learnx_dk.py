@@ -305,6 +305,9 @@ def _parse(argv: list[str]) -> tuple[str, bool, pathlib.Path | None, str | None,
         print("error: --version and --spec are mutually exclusive")
         sys.exit(1)
 
+    if version is not None:
+        mode = "yolo"
+
     return mode, dry_run, spec, version, rest
 
 
