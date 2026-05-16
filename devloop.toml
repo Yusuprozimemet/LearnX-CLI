@@ -28,3 +28,16 @@ rate_limit_patterns = [
     "429 too many requests",
     "quota exceeded",
 ]
+
+# [notify]
+# Credentials are NEVER stored here — list the env var name, not the value.
+#
+# Webhook — receives JSON POST on completion/failure
+# webhook_url = "https://hooks.example.com/learnx"
+#
+# Telegram — reads token and chat_id from the named environment variables
+# telegram_token_env = "NOTIFY_TELEGRAM_TOKEN"
+# telegram_chat_id_env = "NOTIFY_TELEGRAM_CHAT_ID"
+#
+# Custom script — receives result JSON on stdin, exit code is ignored
+# script = "scripts/notify.sh"
