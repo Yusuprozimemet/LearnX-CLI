@@ -26,7 +26,7 @@ specs/          versioned spec files — source of truth for all code
 plan/           version-level design documents
   v0_plan.md … v3_plan.md
 
-fixes/          post-mortem notes for surprises (fix001.md … fix021.md)
+fixes/          post-mortem notes for surprises (fix001.md … fix035.md)
                 read these before starting work — they contain env/API gotchas
 
 dev_setup/      developer process documentation
@@ -120,15 +120,18 @@ Follow these steps for every spec day, in order:
 11. python -m ruff format --check tutor/
 12. If anything fails in 8-11: fix, re-run
 13. python scripts/run_review.py --spec specs/v3/dayN.md  ← review agents (new)
-14. Report:
+14. Write a fixes file for every non-obvious bug found and fixed during the session:
+      - Use the next available number: fixes/fix0NN.md
+      - Include: symptom, root cause, fix (with code snippet), test added, rules for
+        future work
+      - Write "none needed" in the report if nothing surprising was encountered
+      - NEVER skip this step — fixes files are permanent project memory
+15. Report:
       - acceptance criteria checklist (PASS / FAIL for each)
       - gate status (all green / what failed)
       - files changed (list)
-      - surprises encountered: any non-obvious env quirk, API edge case, or tool
-        gotcha you hit during the session — one bullet per item, with context.
-        Write "none" if nothing surprised you.
-        Do NOT write to fixes/ — just list them here for the human to decide.
-15. STOP — do not merge to main; the human reviews findings + diff + screenshots
+      - fixes files written (list, or "none")
+16. STOP — do not merge to main; the human reviews findings + diff + screenshots
 ```
 
 Note: steps 6–11 use `python` (Linux inside container), not `py` (Windows host).
@@ -174,6 +177,7 @@ NEVER branch sandbox/dayN off another sandbox branch (always branch from main)
 NEVER skip the merge gate (full pytest + ruff)
 NEVER merge — human merges after review
 NEVER start Day N+1 until Day N is merged to main
+NEVER skip writing a fixes file after finding and fixing a non-obvious bug
 ```
 
 ---
@@ -223,6 +227,48 @@ git branch -d sandbox/day<N>
 git checkout main
 git branch -D sandbox/day<N>
 ```
+
+---
+
+## Fix File Protocol
+
+Write a fix file whenever a non-obvious bug is found and fixed — during a spec day,
+a review cycle, or a standalone fix session. Do not wait to be asked.
+
+**When to write one:**
+- A bug was found where the root cause was not immediately obvious from reading the code
+- A workaround was required for an environment quirk, API edge case, or tool behaviour
+- A regression test was added to prevent the bug recurring
+
+**When NOT to write one:**
+- The fix was a trivial typo or obviously wrong literal
+- The issue was already covered by an existing fixes file
+
+**Required sections (use fixes/fix031.md as a template):**
+
+```
+# fixNNN — one-line description
+
+**Date:** YYYY-MM-DD
+
+## Symptom
+What went wrong from the user's perspective.
+
+## Root cause
+Why it happened — include the specific line(s) and the reasoning gap.
+
+## Fix
+What changed — include a before/after code snippet.
+
+## Test added
+Name and purpose of the regression test.
+
+## Rules for future work
+1–3 actionable rules to prevent the same class of bug.
+```
+
+**Numbering:** check the highest existing number in `fixes/` and increment by 1.
+Pad to three digits: `fix036.md`, not `fix36.md`.
 
 ---
 
