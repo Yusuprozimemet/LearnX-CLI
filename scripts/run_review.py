@@ -83,6 +83,8 @@ The phase 1 review produced the following report:
 {phase1_report}
 === END PHASE 1 REPORT ===
 
+{agents_instruction}
+
 Launch these two agents IN PARALLEL using the Task tool:
 1. verify_fixes      — for each phase 1 finding, was it fully resolved?
 2. regression_check  — did the fix commits introduce any new problems?
@@ -175,7 +177,7 @@ def run_phase1(
     ).strip()
     prompt = base_prompt + "\n\n" + PHASE_1_FIX_ADDENDUM.strip()
 
-    cmd = build_command(project_dir, home_dir, extra_args=[], interactive=False)
+    cmd = build_command(project_dir, home_dir, extra_args=extra_args, interactive=False)
     claude_idx = cmd.index("claude")
     cmd = cmd[:claude_idx] + [
         "claude",
@@ -202,11 +204,13 @@ def run_phase2(
         returncode — exit code of the Claude session
         output     — full captured stdout
     """
+    agents_instruction = f"Review agents are in {agents_dir}/."
     prompt = PHASE_2_PROMPT_TEMPLATE.format(
         phase1_report=phase1_report,
+        agents_instruction=agents_instruction,
     ).strip()
 
-    cmd = build_command(project_dir, home_dir, extra_args=[], interactive=False)
+    cmd = build_command(project_dir, home_dir, extra_args=extra_args, interactive=False)
     claude_idx = cmd.index("claude")
     cmd = cmd[:claude_idx] + [
         "claude",

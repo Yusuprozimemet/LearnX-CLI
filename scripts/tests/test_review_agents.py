@@ -189,5 +189,6 @@ def test_phase1_fix_addendum_mentions_commit():
 
 def test_phase2_prompt_template_has_phase1_report_placeholder():
     assert "{phase1_report}" in PHASE_2_PROMPT_TEMPLATE
+    assert "{agents_instruction}" in PHASE_2_PROMPT_TEMPLATE
     assert "verify_fixes" in PHASE_2_PROMPT_TEMPLATE
     assert "regression_check" in PHASE_2_PROMPT_TEMPLATE
