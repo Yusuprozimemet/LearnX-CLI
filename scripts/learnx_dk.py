@@ -138,16 +138,20 @@ def build_docker_command(
     return cmd
 
 
-def _build_e2e_command(project_dir: pathlib.Path) -> list[str]:
+def _build_e2e_command(
+    project_dir: pathlib.Path,
+    image: str = IMAGE,
+    workspace: str = WORKSPACE,
+) -> list[str]:
     return [
         "docker",
         "run",
         "--rm",
         "-v",
-        f"{_to_posix(project_dir)}:{WORKSPACE}",
+        f"{_to_posix(project_dir)}:{workspace}",
         "-w",
-        WORKSPACE,
-        IMAGE,
+        workspace,
+        image,
         "python",
         "-m",
         "pytest",
@@ -197,13 +201,15 @@ def run_implement(
     image: str = IMAGE,
     workspace: str = WORKSPACE,
 ) -> None:
-    container_cmd = build_docker_command(project_dir, home_dir, extra_args, image=image, workspace=workspace)
+    container_cmd = build_docker_command(
+        project_dir, home_dir, extra_args, image=image, workspace=workspace
+    )
 
     if dry_run:
         print("# Step 1 — container session")
         print(" ".join(container_cmd))
         if review:
-            e2e_cmd = _build_e2e_command(project_dir)
+            e2e_cmd = _build_e2e_command(project_dir, image=image, workspace=workspace)
             review_cmd = [_PY, "scripts/run_review.py"]
             if spec:
                 review_cmd += ["--spec", spec.as_posix()]
@@ -218,7 +224,9 @@ def run_implement(
 
     if review:
         print("\n[implement] running E2E smoke tests...")
-        e2e_result = subprocess.run(_build_e2e_command(project_dir), check=False)
+        e2e_result = subprocess.run(
+            _build_e2e_command(project_dir, image=image, workspace=workspace), check=False
+        )
 
         review_cmd = [_PY, "scripts/run_review.py"]
         if spec:
@@ -301,6 +309,8 @@ def run_yolo_version(
     extra_args: list[str],
     dry_run: bool,
     specs_dir: str = "specs",
+    image: str = IMAGE,
+    workspace: str = WORKSPACE,
 ) -> None:
     specs = _discover_specs(project_dir / specs_dir, version)
     if not specs:
@@ -320,7 +330,14 @@ def run_yolo_version(
             results.append(SpecResult(spec.stem, "FAILED", duration_s, branch))
             continue
         run_implement(
-            project_dir, home_dir, spec=spec, review=review, extra_args=extra_args, dry_run=dry_run
+            project_dir,
+            home_dir,
+            spec=spec,
+            review=review,
+            extra_args=extra_args,
+            dry_run=dry_run,
+            image=image,
+            workspace=workspace,
         )
         duration_s = time.monotonic() - t0
         results.append(SpecResult(spec.stem, "DONE", duration_s, branch))
@@ -411,13 +428,21 @@ def main(argv: list[str] | None = None) -> None:
 
     if version:
         run_yolo_version(
-            project_dir, home_dir, version, review, extra, dry_run,
+            project_dir,
+            home_dir,
+            version,
+            review,
+            extra,
+            dry_run,
             specs_dir=specs_dir,
+            image=image,
+            workspace=workspace,
         )
         return
 
-    run_implement(project_dir, home_dir, spec, review, extra, dry_run,
-                  image=image, workspace=workspace)
+    run_implement(
+        project_dir, home_dir, spec, review, extra, dry_run, image=image, workspace=workspace
+    )
 
 
 if __name__ == "__main__":

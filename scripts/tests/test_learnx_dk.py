@@ -102,17 +102,13 @@ def test_load_config_returns_defaults_when_toml_missing(tmp_path):
 
 
 def test_load_config_reads_docker_image_from_toml(tmp_path):
-    (tmp_path / "devloop.toml").write_text(
-        '[project]\ndocker_image = "custom-image"\n'
-    )
+    (tmp_path / "devloop.toml").write_text('[project]\ndocker_image = "custom-image"\n')
     config = _load_config(tmp_path)
     assert config["project"]["docker_image"] == "custom-image"
 
 
 def test_load_config_merges_missing_keys_with_defaults(tmp_path):
-    (tmp_path / "devloop.toml").write_text(
-        '[project]\ndocker_image = "custom-image"\n'
-    )
+    (tmp_path / "devloop.toml").write_text('[project]\ndocker_image = "custom-image"\n')
     config = _load_config(tmp_path)
     assert config["project"]["workspace"] == "/workspace"
 
@@ -123,6 +119,52 @@ def test_build_docker_command_uses_custom_image(dirs):
     assert "my-img" in cmd
     mounts = [cmd[i + 1] for i, a in enumerate(cmd) if a == "-v"]
     assert any("/app" in m for m in mounts)
+
+
+def test_run_yolo_version_forwards_image_to_run_implement(tmp_path, dirs, capsys):
+    """image/workspace from config must reach run_implement, not be hardcoded."""
+    project, home = dirs
+    ver_dir = tmp_path / "specs" / "v5"
+    ver_dir.mkdir(parents=True)
+    (ver_dir / "day1.md").write_text("# day1")
+
+    with (
+        patch("scripts.learnx_dk.run_implement") as mock_impl,
+        patch("scripts.learnx_dk._checkout_spec_branch", return_value=True),
+    ):
+        run_yolo_version(
+            tmp_path,
+            home,
+            "v5",
+            review=False,
+            extra_args=[],
+            dry_run=False,
+            image="custom-img",
+            workspace="/custom",
+        )
+
+    mock_impl.assert_called_once()
+    call_kwargs = mock_impl.call_args.kwargs
+    assert call_kwargs.get("image") == "custom-img"
+    assert call_kwargs.get("workspace") == "/custom"
+
+
+def test_implement_review_dry_run_e2e_uses_custom_image(dirs, capsys):
+    """E2E command in --review path must use the same image/workspace as the container."""
+    project, home = dirs
+    run_implement(
+        project,
+        home,
+        spec=None,
+        review=True,
+        extra_args=[],
+        dry_run=True,
+        image="custom-img",
+        workspace="/custom",
+    )
+    out = capsys.readouterr().out
+    assert "custom-img" in out
+    assert "/custom" in out
 
 
 # ── Day 20 (v6) tests ────────────────────────────────────────────────────────
