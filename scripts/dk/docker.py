@@ -3,8 +3,6 @@ import pathlib
 import shlex
 import sys
 
-from scripts.dk.config import _DEFAULTS
-
 IMAGE = "learnx-dev"
 WORKSPACE = "/workspace"
 SETTINGS_LOCAL = pathlib.Path(".claude/settings.local.json")

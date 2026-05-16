@@ -16,7 +16,6 @@ from scripts.learnx_dk import (
     run_yolo_version,
 )
 
-
 # ── Day 26 — payload and notifier ────────────────────────────────────────────
 
 
@@ -65,9 +64,7 @@ def test_notifier_webhook_posts_json():
 
 def test_notifier_webhook_failure_does_not_raise(capsys):
     n = Notifier({"notify": {"webhook_url": "https://example.com/hook"}})
-    with patch(
-        "scripts.dk.notifier.urllib.request.urlopen", side_effect=OSError("no network")
-    ):
+    with patch("scripts.dk.notifier.urllib.request.urlopen", side_effect=OSError("no network")):
         n.send({"status": "completed"})
     out = capsys.readouterr().out
     assert "webhook failed" in out

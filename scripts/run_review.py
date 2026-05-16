@@ -64,6 +64,58 @@ NOTE: Do NOT write to the fixes/ directory. This section is for the human to rea
 and decide whether the finding warrants a permanent fix note.
 """
 
+PHASE_1_FIX_ADDENDUM = """
+After writing the consolidated report above, check the ## Recommendation section:
+
+If the recommendation is NEEDS FIXES:
+  1. Apply every blocking fix using Edit/Write tools
+  2. Run: python -m pytest tutor/tests/ --ignore=tutor/tests/e2e/ -m 'not slow' -q
+  3. Commit all fixes: git add -A && git commit -m "review: phase 1 fix findings"
+
+If the recommendation is MERGE READY, skip this step.
+"""
+
+PHASE_2_PROMPT_TEMPLATE = """
+You are running Phase 2 of a two-phase code review.
+
+The phase 1 review produced the following report:
+=== PHASE 1 REPORT ===
+{phase1_report}
+=== END PHASE 1 REPORT ===
+
+Launch these two agents IN PARALLEL using the Task tool:
+1. verify_fixes      — for each phase 1 finding, was it fully resolved?
+2. regression_check  — did the fix commits introduce any new problems?
+
+After both agents complete, output:
+
+## Phase 2 Verification
+
+### Fix completeness
+[paste verify_fixes agent output verbatim]
+
+### Regression check
+[paste regression_check agent output verbatim]
+
+## Phase 2 Gate
+VERIFIED — all findings resolved and no regressions introduced
+or
+STILL FAILING — [list unresolved findings and/or regressions]
+"""
+
+
+def _capture_output(cmd: list[str]) -> tuple[int, str]:
+    """Run cmd, stream stdout to terminal, return (returncode, full_output)."""
+    lines: list[str] = []
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    assert proc.stdout is not None
+    for raw in proc.stdout:
+        line = raw.decode(errors="replace")
+        print(line, end="", flush=True)
+        lines.append(line)
+    proc.wait()
+    return proc.returncode, "".join(lines)
+
 
 def build_review_command(
     project_dir: pathlib.Path,
@@ -95,6 +147,76 @@ def build_review_command(
     ]
 
     return cmd
+
+
+def run_phase1(
+    project_dir: pathlib.Path,
+    home_dir: pathlib.Path,
+    spec_path: pathlib.Path | None,
+    agents_dir: str,
+    extra_args: list[str],
+) -> tuple[int, str, bool]:
+    """Run the 5-agent phase 1 review and apply fixes.
+
+    Returns:
+        returncode   — exit code of the Claude session
+        output       — full captured stdout
+        had_findings — True if output contains "NEEDS FIXES"
+    """
+    if spec_path:
+        spec_instruction = f"Spec file: {spec_path} (pass to implementation agent)"
+    else:
+        spec_instruction = "No spec file provided — implementation agent checks consistency only."
+
+    agents_instruction = f"Review agents are in {agents_dir}/."
+    base_prompt = REVIEW_PROMPT_TEMPLATE.format(
+        spec_instruction=spec_instruction,
+        agents_instruction=agents_instruction,
+    ).strip()
+    prompt = base_prompt + "\n\n" + PHASE_1_FIX_ADDENDUM.strip()
+
+    cmd = build_command(project_dir, home_dir, extra_args=[], interactive=False)
+    claude_idx = cmd.index("claude")
+    cmd = cmd[:claude_idx] + [
+        "claude",
+        "--dangerously-skip-permissions",
+        "--print",
+        prompt,
+    ]
+
+    rc, output = _capture_output(cmd)
+    had_findings = "NEEDS FIXES" in output
+    return rc, output, had_findings
+
+
+def run_phase2(
+    project_dir: pathlib.Path,
+    home_dir: pathlib.Path,
+    phase1_report: str,
+    agents_dir: str,
+    extra_args: list[str],
+) -> tuple[int, str]:
+    """Run the 2-agent phase 2 verification.
+
+    Returns:
+        returncode — exit code of the Claude session
+        output     — full captured stdout
+    """
+    prompt = PHASE_2_PROMPT_TEMPLATE.format(
+        phase1_report=phase1_report,
+    ).strip()
+
+    cmd = build_command(project_dir, home_dir, extra_args=[], interactive=False)
+    claude_idx = cmd.index("claude")
+    cmd = cmd[:claude_idx] + [
+        "claude",
+        "--dangerously-skip-permissions",
+        "--print",
+        prompt,
+    ]
+
+    rc, output = _capture_output(cmd)
+    return rc, output
 
 
 def main(argv: list[str] | None = None) -> None:

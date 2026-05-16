@@ -3,7 +3,13 @@ from unittest.mock import patch
 
 import pytest
 
-from scripts.run_review import REVIEW_PROMPT_TEMPLATE, build_review_command, main
+from scripts.run_review import (
+    PHASE_1_FIX_ADDENDUM,
+    PHASE_2_PROMPT_TEMPLATE,
+    REVIEW_PROMPT_TEMPLATE,
+    build_review_command,
+    main,
+)
 
 AGENTS_DIR = pathlib.Path(".claude/agents")
 AGENT_NAMES = ["quality", "implementation", "testing", "simplification", "product_check"]
@@ -153,3 +159,35 @@ def test_review_agents_dir_missing_value_exits(dirs):
         with pytest.raises(SystemExit) as exc:
             main(["--agents-dir"])
     assert exc.value.code == 1
+
+
+# ── Day 28 — two-phase review components ─────────────────────────────────────
+
+
+def test_new_agent_files_exist():
+    for name in ("verify_fixes", "regression_check"):
+        assert (AGENTS_DIR / f"{name}.md").exists(), f"{name}.md missing"
+
+
+def test_verify_fixes_agent_frontmatter():
+    fm, body = _parse_frontmatter(AGENTS_DIR / "verify_fixes.md")
+    assert fm.get("name") == "verify_fixes"
+    assert "description" in fm
+    assert len(body) >= 50
+
+
+def test_regression_check_agent_frontmatter():
+    fm, body = _parse_frontmatter(AGENTS_DIR / "regression_check.md")
+    assert fm.get("name") == "regression_check"
+    assert "description" in fm
+    assert len(body) >= 50
+
+
+def test_phase1_fix_addendum_mentions_commit():
+    assert "commit" in PHASE_1_FIX_ADDENDUM.lower()
+
+
+def test_phase2_prompt_template_has_phase1_report_placeholder():
+    assert "{phase1_report}" in PHASE_2_PROMPT_TEMPLATE
+    assert "verify_fixes" in PHASE_2_PROMPT_TEMPLATE
+    assert "regression_check" in PHASE_2_PROMPT_TEMPLATE

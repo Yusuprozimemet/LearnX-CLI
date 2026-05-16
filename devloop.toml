@@ -16,6 +16,7 @@ format_check = "python -m ruff format --check tutor/"
 [review]
 agents_dir = ".claude/agents"
 review_script = "scripts/run_review.py"
+two_phase = true          # set false to skip phase 2 verification
 
 [resilience]
 session_timeout_minutes = 30   # kill container after this wall-clock time
