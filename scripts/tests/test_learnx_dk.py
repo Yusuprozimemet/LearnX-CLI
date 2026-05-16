@@ -271,10 +271,36 @@ def test_spec_branch_name():
 
 
 def test_checkout_spec_branch_dry_run(capsys):
-    _checkout_spec_branch("sandbox/v5-day1", dry_run=True)
+    ok = _checkout_spec_branch("sandbox/v5-day1", dry_run=True)
     out = capsys.readouterr().out
+    assert ok is True
     assert "git checkout main" in out
     assert "sandbox/v5-day1" in out
+
+
+def test_checkout_spec_branch_returns_false_on_git_failure(capsys):
+    with patch("scripts.learnx_dk.subprocess.run") as mock_run:
+        mock_run.return_value.returncode = 1
+        ok = _checkout_spec_branch("sandbox/v5-day1", dry_run=False)
+    assert ok is False
+    assert "error" in capsys.readouterr().out
+
+
+def test_run_yolo_version_records_failed_when_checkout_fails(tmp_path, dirs, capsys):
+    project, home = dirs
+    ver_dir = tmp_path / "specs" / "v5"
+    ver_dir.mkdir(parents=True)
+    (ver_dir / "day1.md").write_text("# day1")
+
+    with (
+        patch("scripts.learnx_dk._checkout_spec_branch", return_value=False),
+        patch("scripts.learnx_dk.run_yolo") as mock_yolo,
+    ):
+        run_yolo_version(tmp_path, home, "v5", extra_args=[], dry_run=False)
+
+    mock_yolo.assert_not_called()
+    out = capsys.readouterr().out
+    assert "FAILED" in out
 
 
 def test_print_version_report_shows_all_specs(capsys):

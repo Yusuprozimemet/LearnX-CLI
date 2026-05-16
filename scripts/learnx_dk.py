@@ -256,8 +256,11 @@ def _spec_branch_name(version: str, spec_stem: str) -> str:
     return f"sandbox/{version}-{spec_stem}"
 
 
-def _checkout_spec_branch(branch: str, dry_run: bool) -> None:
-    """Checkout main then create a fresh branch for this spec."""
+def _checkout_spec_branch(branch: str, dry_run: bool) -> bool:
+    """Checkout main then create a fresh branch for this spec.
+
+    Returns True if all git commands succeeded, False otherwise.
+    """
     cmds = [
         ["git", "checkout", "main"],
         ["git", "checkout", "-b", branch],
@@ -265,11 +268,13 @@ def _checkout_spec_branch(branch: str, dry_run: bool) -> None:
     if dry_run:
         for cmd in cmds:
             print(" ".join(cmd))
-        return
+        return True
     for cmd in cmds:
         result = subprocess.run(cmd, check=False)
         if result.returncode != 0:
-            print(f"[version] warning: '{' '.join(cmd)}' exited {result.returncode}")
+            print(f"[version] error: '{' '.join(cmd)}' exited {result.returncode}")
+            return False
+    return True
 
 
 def _print_version_report(results: list[SpecResult], version: str) -> None:
@@ -310,9 +315,12 @@ def run_yolo_version(
     for spec in specs:
         branch = _spec_branch_name(version, spec.stem)
         print(f"\n[version] -- spec: {spec.name}  branch: {branch} --")
-        _checkout_spec_branch(branch, dry_run)
 
         t0 = time.monotonic()
+        if not _checkout_spec_branch(branch, dry_run):
+            duration_s = time.monotonic() - t0
+            results.append(SpecResult(spec.stem, "FAILED", duration_s, branch))
+            continue
         run_yolo(project_dir, home_dir, spec_path=spec, extra_args=extra_args, dry_run=dry_run)
         duration_s = time.monotonic() - t0
 
