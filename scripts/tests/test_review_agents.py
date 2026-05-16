@@ -122,3 +122,34 @@ def test_readme_mentions_fixes_convention():
     text = readme.read_text(encoding="utf-8")
     assert "fixes/" in text
     assert "human" in text
+
+
+def test_build_review_command_accepts_custom_agents_dir(dirs):
+    project, home = dirs
+    cmd = build_review_command(
+        project, home, spec_path=None, extra_args=[], agents_dir="custom/agents"
+    )
+    full = " ".join(cmd)
+    assert "custom/agents" in full
+
+
+def test_review_main_dry_run_accepts_agents_dir_flag(dirs, capsys):
+    with (
+        patch("scripts.run_review.pathlib.Path.cwd", return_value=dirs[0]),
+        patch("scripts.run_review.pathlib.Path.home", return_value=dirs[1]),
+        patch("scripts.run_review.subprocess.run") as mock_run,
+    ):
+        main(["--agents-dir", "my/agents", "--dry-run"])
+    out = capsys.readouterr().out
+    assert "my/agents" in out
+    mock_run.assert_not_called()
+
+
+def test_review_agents_dir_missing_value_exits(dirs):
+    with (
+        patch("scripts.run_review.pathlib.Path.cwd", return_value=dirs[0]),
+        patch("scripts.run_review.pathlib.Path.home", return_value=dirs[1]),
+    ):
+        with pytest.raises(SystemExit) as exc:
+            main(["--agents-dir"])
+    assert exc.value.code == 1
