@@ -316,14 +316,15 @@ class Notifier:
         self._script: str | None = notify.get("script")
 
     def enabled(self) -> bool:
-        """True if at least one channel is configured."""
-        return bool(self._webhook_url or self._tg_token_env or self._script)
+        """True if at least one channel is fully configured."""
+        telegram_ready = bool(self._tg_token_env and self._tg_chat_env)
+        return bool(self._webhook_url or telegram_ready or self._script)
 
     def send(self, payload: dict) -> None:
         """Fire all configured channels. Exceptions are caught and logged."""
         if self._webhook_url:
             self._send_webhook(payload)
-        if self._tg_token_env:
+        if self._tg_token_env and self._tg_chat_env:
             self._send_telegram(payload)
         if self._script:
             self._send_script(payload)
@@ -572,6 +573,7 @@ def run_yolo_version(
         return
 
     print(f"\n[version] {version} - {len(specs)} spec(s) found")
+    start_time = time.monotonic()
     results: list[SpecResult] = []
 
     cfg = config or {}
@@ -658,6 +660,11 @@ def run_yolo_version(
         results.append(SpecResult(spec.stem, status, duration_s, branch, retries=attempt))
 
     _print_version_report(results, version)
+
+    notifier = Notifier(cfg)
+    if notifier.enabled() and not dry_run:
+        payload = _build_notify_payload(version, results, "completed", start_time, cfg)
+        notifier.send(payload)
 
 
 # ── CLI ──────────────────────────────────────────────────────────────────────
@@ -781,6 +788,16 @@ def main(argv: list[str] | None = None) -> None:
         workspace=workspace,
         config=config,
     )
+
+    notifier = Notifier(config)
+    if notifier.enabled() and not dry_run:
+        notifier.send(
+            {
+                "project": proj["name"],
+                "spec": spec.stem if spec else "interactive",
+                "status": "completed",
+            }
+        )
 
 
 if __name__ == "__main__":

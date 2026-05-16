@@ -586,3 +586,68 @@ def test_format_telegram_failure_message():
     assert "NEEDS ATTENTION" in msg
     assert "1 failed" in msg
     assert "1 timed out" in msg
+
+
+# ── Day 26 fixes: Notifier.enabled() and notification wiring ─────────────────
+
+
+def test_notifier_enabled_false_with_only_telegram_token():
+    """enabled() must require both token AND chat_id — partial config is not enough."""
+    n = Notifier({"notify": {"telegram_token_env": "MY_TOKEN"}})
+    assert n.enabled() is False
+
+
+def test_run_yolo_version_calls_notifier_on_completion(tmp_path):
+    """run_yolo_version() must call Notifier.send() when a channel is configured."""
+    (tmp_path / "specs" / "v9").mkdir(parents=True)
+    (tmp_path / "specs" / "v9" / "day1.md").write_text("spec")
+
+    config = {
+        **_DEFAULTS,
+        "notify": {"webhook_url": "https://example.com/hook"},
+    }
+
+    with (
+        patch("scripts.learnx_dk._checkout_spec_branch", return_value=True),
+        patch("scripts.learnx_dk._run_with_timeout", return_value=(0, [], False)),
+        patch("scripts.learnx_dk.Notifier.send") as mock_send,
+    ):
+        run_yolo_version(
+            tmp_path,
+            pathlib.Path.home(),
+            "v9",
+            review=False,
+            extra_args=[],
+            dry_run=False,
+            config=config,
+        )
+
+    mock_send.assert_called_once()
+    payload = mock_send.call_args[0][0]
+    assert payload["version"] == "v9"
+    assert payload["status"] == "completed"
+
+
+def test_main_calls_notifier_after_run_implement(tmp_path):
+    """main() must call Notifier.send() after run_implement() when a channel is configured."""
+    toml_content = (
+        "[project]\n"
+        'name = "TestProj"\n'
+        'docker_image = "img"\n'
+        'workspace = "/ws"\n'
+        'specs_dir = "specs"\n'
+        "[notify]\n"
+        'webhook_url = "https://example.com/hook"\n'
+    )
+    (tmp_path / "devloop.toml").write_text(toml_content)
+
+    with (
+        patch("scripts.learnx_dk.pathlib.Path.cwd", return_value=tmp_path),
+        patch("scripts.learnx_dk.run_implement"),
+        patch("scripts.learnx_dk.Notifier.send") as mock_send,
+    ):
+        main([])
+
+    mock_send.assert_called_once()
+    payload = mock_send.call_args[0][0]
+    assert payload["status"] == "completed"
