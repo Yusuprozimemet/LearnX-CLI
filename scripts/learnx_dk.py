@@ -84,6 +84,7 @@ class SpecResult:
     status: str  # "DONE" | "FAILED" | "TIMED_OUT"
     duration_s: float
     branch: str
+    retries: int = 0  # rate-limit retries consumed
 
 
 # ── constants ────────────────────────────────────────────────────────────────
@@ -195,6 +196,12 @@ def _extract_int_flag(args: list[str], flag: str) -> tuple[int | None, list[str]
         return val, args[:idx] + args[idx + 2 :]
     except (IndexError, ValueError):
         return None, args
+
+
+def _is_rate_limited(last_lines: list[str], patterns: list[str]) -> bool:
+    """Return True if any pattern appears (case-insensitive) in the last output lines."""
+    text = "\n".join(last_lines).lower()
+    return any(p.lower() in text for p in patterns)
 
 
 def _run_with_timeout(
@@ -395,7 +402,12 @@ def _print_version_report(results: list[SpecResult], version: str) -> None:
         else:
             icon = "✗"
         mins = int(r.duration_s / 60)
-        print(f"  {r.spec_name:<12}  {icon} {r.status:<10}  {mins} min")
+        retry_note = (
+            f"  ({r.retries} rate-limit retr{'y' if r.retries == 1 else 'ies'})"
+            if r.retries > 0
+            else ""
+        )
+        print(f"  {r.spec_name:<12}  {icon} {r.status:<10}  {mins} min{retry_note}")
     print(f"{'-' * width}")
     total_mins = int(sum(r.duration_s for r in results) / 60)
     done = sum(1 for r in results if r.status == "DONE")
@@ -418,6 +430,8 @@ def run_yolo_version(
     specs_dir: str = "specs",
     session_timeout_s: float = 1800.0,
     idle_timeout_s: float = 300.0,
+    rate_limit_wait_s: float = 120.0,
+    max_retries: int = 1,
     config: dict | None = None,
 ) -> None:
     specs = _discover_specs(project_dir / specs_dir, version)
@@ -431,6 +445,10 @@ def run_yolo_version(
     cfg = config or {}
     image = cfg.get("project", {}).get("docker_image") or _DEFAULTS["project"]["docker_image"]
     workspace = cfg.get("project", {}).get("workspace") or _DEFAULTS["project"]["workspace"]
+    rate_limit_patterns = (
+        cfg.get("resilience", {}).get("rate_limit_patterns")
+        or _DEFAULTS["resilience"]["rate_limit_patterns"]
+    )
 
     for spec in specs:
         branch = _spec_branch_name(version, spec.stem)
@@ -451,38 +469,61 @@ def run_yolo_version(
             interactive=False,
         )
 
-        if dry_run:
-            print("# container:", " ".join(container_cmd))
-            status = "DONE"
-        else:
-            rc, _last_lines, did_timeout = _run_with_timeout(
+        attempt = 0
+        status = "FAILED"
+
+        while True:
+            if dry_run:
+                print(f"# [dry-run] container: {' '.join(container_cmd)}")
+                status = "DONE"
+                break
+
+            rc, last_lines, did_timeout = _run_with_timeout(
                 container_cmd, session_timeout_s, idle_timeout_s
             )
+
             if did_timeout:
                 status = "TIMED_OUT"
-            elif rc == 0:
-                status = "DONE"
-            else:
-                status = "FAILED"
+                break
 
-            if review and status != "TIMED_OUT":
-                e2e_cmd = (
-                    cfg.get("validation", {}).get("e2e_tests")
-                    or _DEFAULTS["validation"]["e2e_tests"]
+            if rc == 0:
+                status = "DONE"
+                break
+
+            if (
+                rate_limit_wait_s > 0
+                and attempt < max_retries
+                and _is_rate_limited(last_lines, rate_limit_patterns)
+            ):
+                attempt += 1
+                print(
+                    f"\n[resilience] rate limit detected — "
+                    f"waiting {rate_limit_wait_s / 60:.0f} min "
+                    f"(retry {attempt}/{max_retries})",
+                    flush=True,
                 )
-                subprocess.run(
-                    _build_e2e_command(project_dir, e2e_cmd, image, workspace),
-                    check=False,
-                )
-                review_script = (
-                    cfg.get("review", {}).get("review_script")
-                    or _DEFAULTS["review"]["review_script"]
-                )
-                rev_cmd = [_PY, review_script, "--spec", spec.as_posix()]
-                subprocess.run(rev_cmd, check=False)
+                time.sleep(rate_limit_wait_s)
+                continue
+
+            status = "FAILED"
+            break
+
+        if review and status not in ("TIMED_OUT", "FAILED"):
+            e2e_cmd = (
+                cfg.get("validation", {}).get("e2e_tests") or _DEFAULTS["validation"]["e2e_tests"]
+            )
+            subprocess.run(
+                _build_e2e_command(project_dir, e2e_cmd, image, workspace),
+                check=False,
+            )
+            review_script = (
+                cfg.get("review", {}).get("review_script") or _DEFAULTS["review"]["review_script"]
+            )
+            rev_cmd = [_PY, review_script, "--spec", spec.as_posix()]
+            subprocess.run(rev_cmd, check=False)
 
         duration_s = time.monotonic() - t0
-        results.append(SpecResult(spec.stem, status, duration_s, branch))
+        results.append(SpecResult(spec.stem, status, duration_s, branch, retries=attempt))
 
     _print_version_report(results, version)
 
@@ -567,8 +608,14 @@ def main(argv: list[str] | None = None) -> None:
     res = config.get("resilience", _DEFAULTS["resilience"])
     session_timeout_min, extra = _extract_int_flag(extra, "--session-timeout")
     idle_timeout_min, extra = _extract_int_flag(extra, "--idle-timeout")
-    session_timeout_s = (session_timeout_min or res["session_timeout_minutes"]) * 60.0
-    idle_timeout_s = (idle_timeout_min or res["idle_timeout_minutes"]) * 60.0
+    wait_min, extra = _extract_int_flag(extra, "--wait")
+    session_timeout_s = (
+        res["session_timeout_minutes"] if session_timeout_min is None else session_timeout_min
+    ) * 60.0
+    idle_timeout_s = (
+        res["idle_timeout_minutes"] if idle_timeout_min is None else idle_timeout_min
+    ) * 60.0
+    rate_limit_wait_s = (res["rate_limit_wait_minutes"] if wait_min is None else wait_min) * 60.0
 
     if explore:
         run_explore(extra, dry_run)
@@ -585,6 +632,8 @@ def main(argv: list[str] | None = None) -> None:
             specs_dir=specs_dir,
             session_timeout_s=session_timeout_s,
             idle_timeout_s=idle_timeout_s,
+            rate_limit_wait_s=rate_limit_wait_s,
+            max_retries=res["max_retries_per_spec"],
             config=config,
         )
         return
