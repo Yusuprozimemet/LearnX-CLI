@@ -4,7 +4,7 @@ from unittest.mock import patch
 import pytest
 
 from scripts.learnx_dk import (
-    ASSISTED_PERMISSIONS,
+    EXPLORE_PERMISSIONS,
     SpecResult,
     _checkout_spec_branch,
     _discover_specs,
@@ -13,10 +13,8 @@ from scripts.learnx_dk import (
     _spec_branch_name,
     build_command,
     main,
-    run_assisted,
-    run_container,
-    run_supervised,
-    run_yolo,
+    run_explore,
+    run_implement,
     run_yolo_version,
 )
 
@@ -70,7 +68,6 @@ def test_command_omits_claude_mount_when_absent(dirs):
 
 
 def test_dry_run_prints_command_no_subprocess(dirs, capsys):
-    # Default mode is supervised — dry-run prints the host claude command, not docker.
     project, home = dirs
     with (
         patch("scripts.learnx_dk.pathlib.Path.cwd", return_value=project),
@@ -79,20 +76,7 @@ def test_dry_run_prints_command_no_subprocess(dirs, capsys):
     ):
         main(["--dry-run"])
     out = capsys.readouterr().out
-    assert "claude" in out
-    mock_run.assert_not_called()
-
-
-def test_container_dry_run_prints_docker_command(dirs, capsys):
-    project, home = dirs
-    with (
-        patch("scripts.learnx_dk.pathlib.Path.cwd", return_value=project),
-        patch("scripts.learnx_dk.pathlib.Path.home", return_value=home),
-        patch("scripts.learnx_dk.subprocess.run") as mock_run,
-    ):
-        main(["--mode", "container", "--dry-run"])
-    out = capsys.readouterr().out
-    assert "docker" in out
+    assert "docker" in out  # default is now Docker
     mock_run.assert_not_called()
 
 
@@ -105,125 +89,120 @@ def test_extra_args_forwarded_to_claude(dirs):
     assert "opus" in tail
 
 
-# ── Day 2b tests ─────────────────────────────────────────────────────────────
+# ── Day 20 (v6) tests ────────────────────────────────────────────────────────
 
 
-def test_default_mode_is_supervised(dirs, capsys):
+def test_default_dry_run_uses_docker(dirs, capsys):
+    """No flags — Docker container is the default execution path."""
     project, home = dirs
     with (
         patch("scripts.learnx_dk.pathlib.Path.cwd", return_value=project),
         patch("scripts.learnx_dk.pathlib.Path.home", return_value=home),
-        patch("scripts.learnx_dk.subprocess.run"),
+        patch("scripts.learnx_dk.subprocess.run") as mock_run,
     ):
         main(["--dry-run"])
     out = capsys.readouterr().out
-    assert "claude" in out
-    assert "docker" not in out
+    assert "docker" in out
+    mock_run.assert_not_called()
 
 
-def test_supervised_dry_run_no_docker(capsys):
-    assert _parse(["--mode", "supervised"])[0] == "supervised"
-    run_supervised([], dry_run=True)
-    out = capsys.readouterr().out
-    assert out.strip() == "claude"
-
-
-def test_assisted_dry_run_shows_settings_write(capsys):
-    run_assisted([], dry_run=True)
-    out = capsys.readouterr().out
-    assert "settings.local.json" in out
-
-
-def test_assisted_writes_and_deletes_settings_local(tmp_path, monkeypatch):
-    local = tmp_path / "settings.local.json"
-    monkeypatch.setattr("scripts.learnx_dk.SETTINGS_LOCAL", local)
-    with patch("scripts.learnx_dk.subprocess.run"):
-        run_assisted([], dry_run=False)
-    assert not local.exists()
-
-
-def test_assisted_cleans_up_on_exception(tmp_path, monkeypatch):
-    local = tmp_path / "settings.local.json"
-    monkeypatch.setattr("scripts.learnx_dk.SETTINGS_LOCAL", local)
-    with patch("scripts.learnx_dk.subprocess.run", side_effect=RuntimeError("boom")):
-        with pytest.raises(RuntimeError):
-            run_assisted([], dry_run=False)
-    assert not local.exists()
-
-
-def test_assisted_permissions_have_no_deny():
-    assert "deny" not in ASSISTED_PERMISSIONS.get("permissions", {})
-
-
-def test_assisted_permissions_allow_git_commit():
-    allows = ASSISTED_PERMISSIONS["permissions"]["allow"]
-    assert any("git commit" in rule for rule in allows)
-
-
-def test_container_dry_run_has_skip_permissions(dirs, capsys):
+def test_default_dry_run_prints_docker_command(dirs, capsys):
     project, home = dirs
-    run_container(project, home, extra_args=[], dry_run=True)
+    with (
+        patch("scripts.learnx_dk.pathlib.Path.cwd", return_value=project),
+        patch("scripts.learnx_dk.pathlib.Path.home", return_value=home),
+        patch("scripts.learnx_dk.subprocess.run") as mock_run,
+    ):
+        main(["--dry-run"])
+    out = capsys.readouterr().out
+    assert "docker" in out
+    mock_run.assert_not_called()
+
+
+def test_implement_dry_run_has_skip_permissions(dirs, capsys):
+    project, home = dirs
+    run_implement(project, home, spec=None, review=False, extra_args=[], dry_run=True)
     out = capsys.readouterr().out
     assert "--dangerously-skip-permissions" in out
 
 
-def test_yolo_dry_run_shows_three_steps(dirs, capsys):
+def test_implement_review_dry_run_shows_three_steps(dirs, capsys):
     project, home = dirs
-    run_yolo(project, home, spec_path=None, extra_args=[], dry_run=True)
+    run_implement(project, home, spec=None, review=True, extra_args=[], dry_run=True)
     out = capsys.readouterr().out
     assert "Step 1" in out
     assert "Step 2" in out
     assert "Step 3" in out
 
 
-def test_yolo_dry_run_with_spec(dirs, capsys):
+def test_implement_review_dry_run_with_spec(dirs, capsys):
     project, home = dirs
-    spec = pathlib.Path("specs/v3/day13.md")
-    run_yolo(project, home, spec_path=spec, extra_args=[], dry_run=True)
+    spec = pathlib.Path("specs/v5/day1.md")
+    run_implement(project, home, spec=spec, review=True, extra_args=[], dry_run=True)
     out = capsys.readouterr().out
     assert "--spec" in out
-    assert "day13.md" in out
+    assert "day1.md" in out
 
 
-def test_unknown_mode_exits_1():
-    with pytest.raises(SystemExit) as exc:
-        main(["--mode", "invalid"])
-    assert exc.value.code == 1
+def test_explore_writes_settings_local_when_claude_dir_absent(tmp_path, monkeypatch):
+    """run_explore() must not raise FileNotFoundError on a fresh clone."""
+    local = tmp_path / ".claude" / "settings.local.json"
+    monkeypatch.setattr("scripts.learnx_dk.SETTINGS_LOCAL", local)
+    with patch("scripts.learnx_dk.subprocess.run"):
+        run_explore([], dry_run=False)
+    assert not local.exists()  # cleaned up on exit
 
 
-def test_parse_mode_long_form():
-    mode, _, _, _, _ = _parse(["--mode=container"])
-    assert mode == "container"
+def test_explore_dry_run_runs_on_host(capsys):
+    """--explore outputs a host claude command, not docker."""
+    run_explore([], dry_run=True)
+    out = capsys.readouterr().out
+    assert "docker" not in out
+    assert "claude" in out
 
 
-# ── Day 18 (v5) tests ─────────────────────────────────────────────────────────
+def test_explore_dry_run_shows_settings_local(capsys):
+    """--explore writes and deletes settings.local.json."""
+    run_explore([], dry_run=True)
+    out = capsys.readouterr().out
+    assert "settings.local.json" in out
+
+
+def test_explore_permissions_allow_only_reads():
+    """Explore mode must not allow Edit or Write."""
+    allows = EXPLORE_PERMISSIONS["permissions"]["allow"]
+    assert not any("Edit" in rule for rule in allows)
+    assert not any("Write" in rule for rule in allows)
+
+
+# ── Day 18 (v5) tests ────────────────────────────────────────────────────────
 
 
 def test_parse_version_flag():
-    _, _, _, version, _ = _parse(["--mode", "yolo", "--version", "v5"])
+    _, _, _, _, version, _ = _parse(["--version", "v5"])
     assert version == "v5"
-
-
-def test_version_normalizes_mode_to_yolo():
-    mode, _, _, version, _ = _parse(["--mode", "supervised", "--version", "v5"])
-    assert version == "v5"
-    assert mode == "yolo"
-
-
-def test_version_without_mode_normalizes_to_yolo():
-    mode, _, _, version, _ = _parse(["--version", "v5"])
-    assert version == "v5"
-    assert mode == "yolo"
 
 
 def test_parse_version_equals_form():
-    _, _, _, version, _ = _parse(["--version=v5"])
+    _, _, _, _, version, _ = _parse(["--version=v5"])
     assert version == "v5"
 
 
 def test_version_and_spec_mutually_exclusive():
     with pytest.raises(SystemExit) as exc:
-        _parse(["--version", "v5", "--spec", "specs/v5/day18.md"])
+        _parse(["--version", "v5", "--spec", "specs/v5/day1.md"])
+    assert exc.value.code == 1
+
+
+def test_explore_and_review_mutually_exclusive():
+    with pytest.raises(SystemExit) as exc:
+        _parse(["--explore", "--review"])
+    assert exc.value.code == 1
+
+
+def test_explore_and_version_mutually_exclusive():
+    with pytest.raises(SystemExit) as exc:
+        _parse(["--explore", "--version", "v5"])
     assert exc.value.code == 1
 
 
@@ -248,13 +227,13 @@ def test_run_yolo_version_dry_run_prints_each_spec(tmp_path, dirs, capsys):
     ver_dir.mkdir(parents=True)
     (ver_dir / "day1.md").write_text("# day1")
     (ver_dir / "day2.md").write_text("# day2")
-    run_yolo_version(tmp_path, home, "v5", extra_args=[], dry_run=True)
+    run_yolo_version(tmp_path, home, "v5", review=False, extra_args=[], dry_run=True)
     out = capsys.readouterr().out
     assert "day1.md" in out
     assert "day2.md" in out
 
 
-# ── Day 19 (v5) tests ─────────────────────────────────────────────────────────
+# ── Day 19 (v5) tests ────────────────────────────────────────────────────────
 
 
 def test_spec_result_fields():
@@ -294,11 +273,11 @@ def test_run_yolo_version_records_failed_when_checkout_fails(tmp_path, dirs, cap
 
     with (
         patch("scripts.learnx_dk._checkout_spec_branch", return_value=False),
-        patch("scripts.learnx_dk.run_yolo") as mock_yolo,
+        patch("scripts.learnx_dk.run_implement") as mock_impl,
     ):
-        run_yolo_version(tmp_path, home, "v5", extra_args=[], dry_run=False)
+        run_yolo_version(tmp_path, home, "v5", review=False, extra_args=[], dry_run=False)
 
-    mock_yolo.assert_not_called()
+    mock_impl.assert_not_called()
     out = capsys.readouterr().out
     assert "FAILED" in out
 
@@ -321,6 +300,6 @@ def test_run_yolo_version_dry_run_shows_branch_names(tmp_path, dirs, capsys):
     ver_dir = tmp_path / "specs" / "v5"
     ver_dir.mkdir(parents=True)
     (ver_dir / "day1.md").write_text("# day1")
-    run_yolo_version(tmp_path, home, "v5", extra_args=[], dry_run=True)
+    run_yolo_version(tmp_path, home, "v5", review=False, extra_args=[], dry_run=True)
     out = capsys.readouterr().out
     assert "sandbox/v5-day1" in out
