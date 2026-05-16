@@ -380,6 +380,11 @@ def test_checkout_spec_branch_returns_false_on_git_failure(capsys):
 
 
 def test_run_yolo_version_records_failed_when_checkout_fails(tmp_path, dirs, capsys):
+    """
+    Verifies run_yolo_version records a failed spec when checking out the spec branch fails.
+    
+    Patches _checkout_spec_branch to return False and ensures _run_with_timeout is not invoked, and that the command output includes the marker "FAILED".
+    """
     project, home = dirs
     ver_dir = tmp_path / "specs" / "v5"
     ver_dir.mkdir(parents=True)
@@ -448,7 +453,13 @@ def test_build_docker_command_includes_it_by_default(dirs):
 
 
 def test_run_with_timeout_kills_on_session_timeout():
-    """Process that runs longer than session_timeout_s must be killed (timed_out=True)."""
+    """
+    Verifies a long-running process is terminated when the session timeout elapses.
+    
+    The test starts a Python process that sleeps longer than the configured
+    session timeout and asserts that the helper reports the process was
+    timed out and that its return code is non-zero.
+    """
     cmd = [sys.executable, "-c", "import time; time.sleep(60)"]
     rc, lines, timed_out = _run_with_timeout(cmd, session_timeout_s=2.0, idle_timeout_s=0)
     assert timed_out is True
