@@ -122,7 +122,20 @@ def build_docker_command(
     workspace: str = WORKSPACE,
     interactive: bool = True,
 ) -> list[str]:
-    """Build the docker run command."""
+    """
+    Build the docker command that runs the Claude CLI inside a container with project and user mounts.
+    
+    Parameters:
+        project_dir (pathlib.Path): Host project directory mounted into the container workspace.
+        home_dir (pathlib.Path): Host home directory used to locate optional files to mount (`.claude`, `.claude.json`, `.gitconfig`).
+        extra_args (list[str]): Arguments appended to the `claude --dangerously-skip-permissions` invocation inside the container.
+        image (str): Docker image to run.
+        workspace (str): Container path used as the working directory and target mount for `project_dir`.
+        interactive (bool): If true, allocate a TTY and enable interactive mode (`-it`).
+    
+    Returns:
+        list[str]: The full `docker run` command and arguments ready for subprocess execution.
+    """
     claude_dir = home_dir / ".claude"
     claude_json = home_dir / ".claude.json"
     gitconfig = home_dir / ".gitconfig"
@@ -182,11 +195,34 @@ def build_command(
     workspace: str = WORKSPACE,
     interactive: bool = True,
 ) -> list[str]:
+    """
+    Constructs the command-line invocation to run Claude inside the project's container.
+    
+    Parameters:
+        project_dir (pathlib.Path): Path to the project directory to mount into the container.
+        home_dir (pathlib.Path): User home directory used to locate host config files to mount.
+        extra_args (list[str]): Additional CLI arguments to pass to Claude.
+        image (str): Docker image name to run.
+        workspace (str): Container working directory path that maps to the project mount.
+        interactive (bool): If True, allocate a TTY and attach stdin; if False, run non-interactively.
+    
+    Returns:
+        list[str]: The composed command and arguments suitable for subprocess execution.
+    """
     return build_docker_command(project_dir, home_dir, extra_args, image, workspace, interactive)
 
 
 def _extract_int_flag(args: list[str], flag: str) -> tuple[int | None, list[str]]:
-    """Pop --flag N from args. Return (int_value_or_None, remaining_args)."""
+    """
+    Extracts and removes an integer value for a named flag from an argument list.
+    
+    Parameters:
+        args (list[str]): The argument list to search.
+        flag (str): The flag to look for (e.g. '--session-timeout').
+    
+    Returns:
+        tuple[int | None, list[str]]: A pair where the first element is the parsed integer value for the flag, or `None` if the flag is absent or its value is missing/invalid; the second element is the argument list with the flag and its value removed when a valid integer was parsed, otherwise the original list.
+    """
     if flag not in args:
         return None, args
     idx = args.index(flag)
@@ -202,12 +238,21 @@ def _run_with_timeout(
     session_timeout_s: float,
     idle_timeout_s: float,
 ) -> tuple[int, list[str], bool]:
-    """Run cmd non-interactively with output streaming and two kill triggers.
-
+    """
+    Run a subprocess command while streaming its combined stdout/stderr and enforcing session and idle timeouts.
+    
+    Streams each output line to the current stdout, keeps a rolling buffer of the last 200 output lines, and kills the subprocess if total runtime exceeds session_timeout_s or if no output has appeared for idle_timeout_s (if idle_timeout_s > 0).
+    
+    Parameters:
+        cmd (list[str]): Command and arguments to execute.
+        session_timeout_s (float): Maximum total runtime in seconds before the process is killed.
+        idle_timeout_s (float): Maximum allowed seconds without any output before the process is killed; use 0 to disable idle-timeout.
+    
     Returns:
-        returncode   — process exit code (-9 or similar if killed)
-        last_lines   — last 200 stdout+stderr lines (for rate-limit detection)
-        timed_out    — True if killed by session or idle timeout
+        tuple[int, list[str], bool]:
+            returncode — process exit code (may reflect kill signal if terminated by the watchdog).
+            last_lines — list of the last up to 200 combined stdout/stderr lines captured.
+            timed_out — `True` if the process was killed due to a session or idle timeout, `False` otherwise.
     """
     proc = subprocess.Popen(
         cmd,
@@ -221,6 +266,11 @@ def _run_with_timeout(
     timed_out = [False]
 
     def _reader() -> None:
+        """
+        Continuously reads lines from the subprocess stdout, prints them, stores a rolling buffer of the last 200 lines, and updates the last-output timestamp.
+        
+        Reads each raw line from the global `proc.stdout`, decodes bytes to text (replacing invalid bytes), strips trailing newline characters, prints the resulting line to stdout (flushed), appends the line to the global `ring` list while keeping its length at most 200, and sets `last_output_at[0]` to the current monotonic time.
+        """
         assert proc.stdout is not None
         for raw in proc.stdout:
             line = raw.decode(errors="replace").rstrip()
@@ -231,6 +281,11 @@ def _run_with_timeout(
             last_output_at[0] = time.monotonic()
 
     def _watchdog() -> None:
+        """
+        Monitor a running subprocess and kill it if idle or total session timeouts are exceeded.
+        
+        Runs until the monitored process `proc` exits. If `idle_timeout_s` > 0 and no new output has appeared for that many seconds, or if the total runtime exceeds `session_timeout_s`, prints a timeout message, sets `timed_out[0] = True`, and kills `proc`.
+        """
         deadline = time.monotonic() + session_timeout_s
         while proc.poll() is None:
             now = time.monotonic()
@@ -383,6 +438,18 @@ def _checkout_spec_branch(branch: str, dry_run: bool) -> bool:
 
 
 def _print_version_report(results: list[SpecResult], version: str) -> None:
+    """
+    Print a concise execution summary for a version's spec run results.
+    
+    Parameters:
+        results (list[SpecResult]): Per-spec outcomes; each entry's `spec_name`, `status`, and `duration_s` are used.
+        version (str): Version identifier to display in the report header.
+    
+    Description:
+        Emits a formatted table to stdout listing each spec, an icon for its status (✓ for DONE, ⏱ for TIMED_OUT, ✗ for FAILED),
+        the textual status, and the duration rounded down to whole minutes. Prints aggregate counts for attempted, done,
+        failed, and timed-out specs and the total elapsed minutes across all specs.
+    """
     width = 60
     print(f"\n{'-' * width}")
     print(f"  {version} Execution Summary")
@@ -420,6 +487,33 @@ def run_yolo_version(
     idle_timeout_s: float = 300.0,
     config: dict | None = None,
 ) -> None:
+    """
+    Run all spec markdown files for a given version sequentially in a containerized workflow and print a summary report.
+    
+    For each discovered spec file under project_dir/specs_dir/version this function:
+    - creates a per-spec git branch,
+    - runs the implementation inside a Docker container (non-interactive),
+    - optionally runs E2E tests and the review script on the host when review is enabled and the spec did not time out,
+    - records per-spec results (status, duration, branch) and prints an aggregated version report.
+    
+    Parameters:
+        project_dir (pathlib.Path): Root of the project containing the specs directory.
+        home_dir (pathlib.Path): User home directory used for resolving host mounts and credentials.
+        version (str): Version identifier subdirectory under the specs directory to execute.
+        review (bool): If True, run E2E tests and the host review script after a successful spec run.
+        extra_args (list[str]): Additional arguments forwarded into the container command.
+        dry_run (bool): If True, print planned commands and actions but do not execute container, E2E, or review steps.
+        specs_dir (str): Name of the specs directory under project_dir (default: "specs").
+        session_timeout_s (float): Total allowed runtime in seconds for each spec container; exceeding this marks the spec as `TIMED_OUT`.
+        idle_timeout_s (float): Allowed seconds of no output from the container before it is considered idle and is killed, which also marks the spec as `TIMED_OUT`.
+        config (dict | None): Optional configuration overrides (project image/workspace, validation and review settings). If omitted, defaults are used.
+    
+    Side effects:
+        - Prints progress and summaries to stdout.
+        - Runs git checkout to prepare per-spec branches.
+        - Launches Docker containers and may invoke E2E and review commands on the host.
+        - When dry_run is True, no external commands are executed and no branches are created.
+    """
     specs = _discover_specs(project_dir / specs_dir, version)
     if not specs:
         print(f"[version] no spec files found in {specs_dir}/{version}/")
@@ -545,6 +639,12 @@ def _parse(
 
 
 def main(argv: list[str] | None = None) -> None:
+    """
+    Entry point for the CLI: parse arguments, load project configuration, compute resilience timeouts, and dispatch to the appropriate runner (explore, version, or implement).
+    
+    Parameters:
+        argv (list[str] | None): Command-line arguments to parse (defaults to sys.argv[1:] when None).
+    """
     if argv is None:
         argv = sys.argv[1:]
     # Ensure Unicode output works on Windows terminals (cp1252 -> utf-8)
