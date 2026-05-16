@@ -5,8 +5,12 @@ import pytest
 
 from scripts.learnx_dk import (
     ASSISTED_PERMISSIONS,
+    SpecResult,
+    _checkout_spec_branch,
     _discover_specs,
     _parse,
+    _print_version_report,
+    _spec_branch_name,
     build_command,
     main,
     run_assisted,
@@ -248,3 +252,49 @@ def test_run_yolo_version_dry_run_prints_each_spec(tmp_path, dirs, capsys):
     out = capsys.readouterr().out
     assert "day1.md" in out
     assert "day2.md" in out
+
+
+# ── Day 19 (v5) tests ─────────────────────────────────────────────────────────
+
+
+def test_spec_result_fields():
+    r = SpecResult(spec_name="day1", status="DONE", duration_s=120.0, branch="sandbox/v5-day1")
+    assert r.spec_name == "day1"
+    assert r.status == "DONE"
+    assert r.duration_s == 120.0
+    assert r.branch == "sandbox/v5-day1"
+
+
+def test_spec_branch_name():
+    assert _spec_branch_name("v5", "day1") == "sandbox/v5-day1"
+    assert _spec_branch_name("v5", "day10") == "sandbox/v5-day10"
+
+
+def test_checkout_spec_branch_dry_run(capsys):
+    _checkout_spec_branch("sandbox/v5-day1", dry_run=True)
+    out = capsys.readouterr().out
+    assert "git checkout main" in out
+    assert "sandbox/v5-day1" in out
+
+
+def test_print_version_report_shows_all_specs(capsys):
+    results = [
+        SpecResult("day1", "DONE", 60.0, "sandbox/v5-day1"),
+        SpecResult("day2", "FAILED", 120.0, "sandbox/v5-day2"),
+    ]
+    _print_version_report(results, "v5")
+    out = capsys.readouterr().out
+    assert "day1" in out
+    assert "day2" in out
+    assert "✓" in out
+    assert "✗" in out
+
+
+def test_run_yolo_version_dry_run_shows_branch_names(tmp_path, dirs, capsys):
+    project, home = dirs
+    ver_dir = tmp_path / "specs" / "v5"
+    ver_dir.mkdir(parents=True)
+    (ver_dir / "day1.md").write_text("# day1")
+    run_yolo_version(tmp_path, home, "v5", extra_args=[], dry_run=True)
+    out = capsys.readouterr().out
+    assert "sandbox/v5-day1" in out

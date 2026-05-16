@@ -25,8 +25,19 @@ import pathlib
 import re
 import subprocess
 import sys
+import time
+from dataclasses import dataclass
 
 _PY = sys.executable  # venv-aware Python for host post-container steps
+
+
+@dataclass
+class SpecResult:
+    spec_name: str
+    status: str  # "DONE" | "FAILED"
+    duration_s: float
+    branch: str
+
 
 # ── constants ────────────────────────────────────────────────────────────────
 
@@ -240,6 +251,46 @@ def _discover_specs(specs_dir: pathlib.Path, version: str) -> list[pathlib.Path]
     return sorted(files, key=_key)
 
 
+def _spec_branch_name(version: str, spec_stem: str) -> str:
+    """Return the sandbox branch name for one spec in a version run."""
+    return f"sandbox/{version}-{spec_stem}"
+
+
+def _checkout_spec_branch(branch: str, dry_run: bool) -> None:
+    """Checkout main then create a fresh branch for this spec."""
+    cmds = [
+        ["git", "checkout", "main"],
+        ["git", "checkout", "-b", branch],
+    ]
+    if dry_run:
+        for cmd in cmds:
+            print(" ".join(cmd))
+        return
+    for cmd in cmds:
+        result = subprocess.run(cmd, check=False)
+        if result.returncode != 0:
+            print(f"[version] warning: '{' '.join(cmd)}' exited {result.returncode}")
+
+
+def _print_version_report(results: list[SpecResult], version: str) -> None:
+    width = 60
+    print(f"\n{'-' * width}")
+    print(f"  {version} Execution Summary")
+    print(f"{'-' * width}")
+    for r in results:
+        icon = "✓" if r.status == "DONE" else "✗"
+        mins = int(r.duration_s / 60)
+        print(f"  {r.spec_name:<12}  {icon} {r.status:<8}  {mins} min")
+    print(f"{'-' * width}")
+    total_mins = int(sum(r.duration_s for r in results) / 60)
+    done = sum(1 for r in results if r.status == "DONE")
+    failed = len(results) - done
+    print(
+        f"  {len(results)}/{len(results)} specs attempted · "
+        f"{done} done · {failed} failed · Total: {total_mins} min"
+    )
+
+
 def run_yolo_version(
     project_dir: pathlib.Path,
     home_dir: pathlib.Path,
@@ -254,9 +305,20 @@ def run_yolo_version(
         return
 
     print(f"\n[version] {version} - {len(specs)} spec(s) found")
+    results: list[SpecResult] = []
+
     for spec in specs:
-        print(f"\n[version] -- spec: {spec.name} --")
+        branch = _spec_branch_name(version, spec.stem)
+        print(f"\n[version] -- spec: {spec.name}  branch: {branch} --")
+        _checkout_spec_branch(branch, dry_run)
+
+        t0 = time.monotonic()
         run_yolo(project_dir, home_dir, spec_path=spec, extra_args=extra_args, dry_run=dry_run)
+        duration_s = time.monotonic() - t0
+
+        results.append(SpecResult(spec.stem, "DONE", duration_s, branch))
+
+    _print_version_report(results, version)
 
 
 # ── CLI ──────────────────────────────────────────────────────────────────────
