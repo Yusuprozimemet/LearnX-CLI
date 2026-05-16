@@ -1,6 +1,10 @@
 import subprocess
 import threading
 import time
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from scripts.dk.dashboard import OutputBuffer
 
 
 def _extract_int_flag(args: list[str], flag: str) -> tuple[int | None, list[str]]:
@@ -25,6 +29,7 @@ def _run_with_timeout(
     cmd: list[str],
     session_timeout_s: float,
     idle_timeout_s: float,
+    output_buffer: "OutputBuffer | None" = None,
 ) -> tuple[int, list[str], bool]:
     """Run cmd non-interactively with output streaming and two kill triggers.
 
@@ -53,6 +58,8 @@ def _run_with_timeout(
             if len(ring) > 200:
                 ring.pop(0)
             last_output_at[0] = time.monotonic()
+            if output_buffer is not None:
+                output_buffer.append(line)
 
     def _watchdog() -> None:
         deadline = time.monotonic() + session_timeout_s

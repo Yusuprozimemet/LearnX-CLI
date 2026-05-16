@@ -1,9 +1,19 @@
 import http.client
 import json
 import socket
+import sys
 import threading
+from unittest.mock import patch
 
-from scripts.learnx_dk import DashboardServer, OutputBuffer, SpecResult
+from scripts.learnx_dk import (
+    _DEFAULTS,
+    DashboardServer,
+    OutputBuffer,
+    SpecResult,
+    _run_with_timeout,
+    main,
+    run_yolo_version,
+)
 
 
 def _free_port() -> int:
@@ -111,3 +121,95 @@ def test_dashboard_server_update_reflected_in_status():
         assert payload["results"][0]["spec"] == "day1"
     finally:
         server.stop()
+
+
+# ── Day 31 — dashboard integration tests ─────────────────────────────────────
+
+
+def test_serve_flag_consumed_from_extra(dirs, capsys):
+    """--serve must not be forwarded to Claude as an extra arg."""
+    project, home = dirs
+    with (
+        patch("scripts.learnx_dk.pathlib.Path.cwd", return_value=project),
+        patch("scripts.learnx_dk.pathlib.Path.home", return_value=home),
+        patch("scripts.learnx_dk._load_config", return_value=_DEFAULTS),
+        patch("scripts.learnx_dk.run_implement") as mock_impl,
+    ):
+        main(["--serve", "--dry-run"])
+    if mock_impl.called:
+        call_extra = mock_impl.call_args.kwargs.get(
+            "extra_args",
+            mock_impl.call_args.args[4] if len(mock_impl.call_args.args) > 4 else [],
+        )
+        assert "--serve" not in call_extra
+
+
+def test_port_flag_consumed_from_extra(dirs, capsys):
+    """--port N must not be forwarded to Claude."""
+    project, home = dirs
+    with (
+        patch("scripts.learnx_dk.pathlib.Path.cwd", return_value=project),
+        patch("scripts.learnx_dk.pathlib.Path.home", return_value=home),
+        patch("scripts.learnx_dk._load_config", return_value=_DEFAULTS),
+        patch("scripts.learnx_dk.run_implement") as mock_impl,
+    ):
+        main(["--port", "9090", "--dry-run"])
+    if mock_impl.called:
+        call_extra = mock_impl.call_args.kwargs.get(
+            "extra_args",
+            mock_impl.call_args.args[4] if len(mock_impl.call_args.args) > 4 else [],
+        )
+        assert "--port" not in call_extra
+        assert "9090" not in call_extra
+
+
+def test_run_with_timeout_tees_to_output_buffer():
+    """Lines produced by the subprocess are written to the OutputBuffer."""
+    buf = OutputBuffer()
+    cmd = [sys.executable, "-c", "print('hello-from-container')"]
+    rc, lines, timed_out = _run_with_timeout(
+        cmd, session_timeout_s=30.0, idle_timeout_s=0, output_buffer=buf
+    )
+    assert rc == 0
+    assert any("hello-from-container" in ln for ln in buf.lines())
+
+
+def test_run_yolo_version_with_serve_starts_and_stops_server(tmp_path, dirs):
+    """Dashboard server is started and stopped around the version loop."""
+    _project, home = dirs
+    ver_dir = tmp_path / "specs" / "v5"
+    ver_dir.mkdir(parents=True)
+    (ver_dir / "day1.md").write_text("# day1")
+
+    started: list[bool] = []
+    stopped: list[bool] = []
+
+    class _FakeServer:
+        def start(self) -> None:
+            started.append(True)
+
+        def stop(self) -> None:
+            stopped.append(True)
+
+        def update(self, *a: object, **kw: object) -> None:
+            pass
+
+    with (
+        patch("scripts.dk.runners.DashboardServer", return_value=_FakeServer()),
+        patch("scripts.dk.runners._checkout_spec_branch", return_value=True),
+        patch("scripts.dk.runners._run_with_timeout", return_value=(0, [], False)),
+    ):
+        run_yolo_version(
+            tmp_path,
+            home,
+            "v5",
+            review=False,
+            extra_args=[],
+            dry_run=False,
+            config={**_DEFAULTS},
+            serve=True,
+            port=18888,
+        )
+
+    assert started == [True]
+    assert stopped == [True]

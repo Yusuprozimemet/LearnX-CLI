@@ -19,6 +19,7 @@ Examples:
     python scripts/learnx_dk.py --dry-run
 """
 
+import os
 import pathlib
 import sys
 
@@ -137,6 +138,16 @@ def main(argv: list[str] | None = None) -> None:
     ) * 60.0
     rate_limit_wait_s = (res["rate_limit_wait_minutes"] if wait_min is None else wait_min) * 60.0
 
+    serve = "--serve" in extra
+    extra = [a for a in extra if a != "--serve"]
+    port_override, extra = _extract_int_flag(extra, "--port")
+    dash_cfg = config.get("dashboard", _DEFAULTS["dashboard"])
+    env_port = int(os.environ.get("LEARNX_DASHBOARD_PORT", 0))
+    port = port_override or env_port or dash_cfg["default_port"]
+
+    if serve and not version:
+        print("[dashboard] --serve is only used with --version; ignoring", flush=True)
+
     if explore:
         run_explore(extra, dry_run)
         return
@@ -155,6 +166,8 @@ def main(argv: list[str] | None = None) -> None:
             rate_limit_wait_s=rate_limit_wait_s,
             max_retries=res["max_retries_per_spec"],
             config=config,
+            serve=serve,
+            port=port,
         )
         return
 
