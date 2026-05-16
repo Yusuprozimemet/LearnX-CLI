@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """
-learnx_dk.py — Multi-mode Claude Code launcher for LearnX.
+learnx_dk.py — Claude Code launcher for LearnX.
 
 Usage:
-    python scripts/learnx_dk.py [--mode MODE] [--dry-run] [--spec PATH]
+    python scripts/learnx_dk.py [--explore] [--review] [--dry-run] [--spec PATH]
 
-Modes:
-    supervised   Host machine, current settings.json (deny rules active). Default.
-    assisted     Host machine, expanded allow, no deny (writes settings.local.json).
-    container    Docker container, --dangerously-skip-permissions. Zero prompts.
-    yolo         Docker + --dangerously-skip-permissions + auto E2E + auto review.
+Flags:
+    (none)      Docker container session (default — zero prompts)
+    --explore   Host session, read-only permissions (no Docker)
+    --review    After container session: run E2E + 5-agent review
+    --version V Run all specs in specs/V/ sequentially
 
 Examples:
-    python scripts/learnx_dk.py                              # supervised
-    python scripts/learnx_dk.py --mode assisted
-    python scripts/learnx_dk.py --mode container
-    python scripts/learnx_dk.py --mode yolo --spec specs/v3/day13.md
-    python scripts/learnx_dk.py --mode container --dry-run
+    python scripts/learnx_dk.py                              # Docker (default)
+    python scripts/learnx_dk.py --explore
+    python scripts/learnx_dk.py --spec specs/v5/day18.md --review
+    python scripts/learnx_dk.py --version v5 --review
+    python scripts/learnx_dk.py --dry-run
 """
 
 import json
@@ -44,32 +44,16 @@ class SpecResult:
 IMAGE = "learnx-dev"
 WORKSPACE = "/workspace"
 
-MODES = ("supervised", "assisted", "container", "yolo")
-
-BANNER = {
-    "supervised": "SUPERVISED  — host machine, deny rules active, prompts on risky ops",
-    "assisted": "ASSISTED    — host machine, no deny rules, prompts only for push/merge",
-    "container": "CONTAINER   — Docker, --dangerously-skip-permissions, zero prompts",
-    "yolo": "YOLO        — Docker + auto E2E + auto review after session ends",
-}
-
-ASSISTED_PERMISSIONS = {
+EXPLORE_PERMISSIONS = {
     "permissions": {
         "allow": [
-            "Bash(py -m pytest*)",
-            "Bash(py -m ruff*)",
-            "Bash(python*)",
-            "Bash(git status*)",
-            "Bash(git diff*)",
-            "Bash(git log*)",
-            "Bash(git add*)",
-            "Bash(git commit*)",
-            "Bash(git checkout*)",
-            "Bash(git branch*)",
-            "Bash(git stash*)",
             "Read(*)",
-            "Edit(*)",
-            "Write(*)",
+            "Glob(*)",
+            "Grep(*)",
+            "Bash(git status*)",
+            "Bash(git log*)",
+            "Bash(git diff*)",
+            "Bash(git branch*)",
         ]
     }
 }
@@ -83,19 +67,12 @@ def _to_posix(p: pathlib.Path) -> str:
     return p.as_posix()
 
 
-def _print_banner(mode: str) -> None:
-    width = 60
-    print("-" * width)
-    print(f"  learnx_dk  |  {BANNER[mode]}")
-    print("-" * width)
-
-
 def build_docker_command(
     project_dir: pathlib.Path,
     home_dir: pathlib.Path,
     extra_args: list[str],
 ) -> list[str]:
-    """Build the docker run command (unchanged from Day 2)."""
+    """Build the docker run command."""
     claude_dir = home_dir / ".claude"
     claude_json = home_dir / ".claude.json"
     gitconfig = home_dir / ".gitconfig"
@@ -126,61 +103,7 @@ def build_docker_command(
     return cmd
 
 
-def build_host_command(extra_args: list[str]) -> list[str]:
-    """Build the host claude command (supervised / assisted)."""
-    return ["claude"] + extra_args
-
-
-# kept for backwards-compatibility with Day 2 tests and run_review.py
-def build_command(
-    project_dir: pathlib.Path,
-    home_dir: pathlib.Path,
-    extra_args: list[str],
-) -> list[str]:
-    return build_docker_command(project_dir, home_dir, extra_args)
-
-
-# ── mode runners ─────────────────────────────────────────────────────────────
-
-
-def run_supervised(extra_args: list[str], dry_run: bool) -> None:
-    cmd = build_host_command(extra_args)
-    if dry_run:
-        print(" ".join(cmd))
-        return
-    subprocess.run(cmd, check=False)
-
-
-def run_assisted(extra_args: list[str], dry_run: bool) -> None:
-    cmd = build_host_command(extra_args)
-    if dry_run:
-        print(f"[writes {SETTINGS_LOCAL}]")
-        print(" ".join(cmd))
-        print(f"[deletes {SETTINGS_LOCAL}]")
-        return
-    SETTINGS_LOCAL.write_text(json.dumps(ASSISTED_PERMISSIONS, indent=2))
-    try:
-        subprocess.run(cmd, check=False)
-    finally:
-        if SETTINGS_LOCAL.exists():
-            SETTINGS_LOCAL.unlink()
-
-
-def run_container(
-    project_dir: pathlib.Path,
-    home_dir: pathlib.Path,
-    extra_args: list[str],
-    dry_run: bool,
-) -> None:
-    cmd = build_docker_command(project_dir, home_dir, extra_args)
-    if dry_run:
-        print(" ".join(cmd))
-        return
-    subprocess.run(cmd, check=False)
-
-
 def _build_e2e_command(project_dir: pathlib.Path) -> list[str]:
-    """Run E2E tests inside the container — ffmpeg, Playwright, and chromium are there."""
     return [
         "docker",
         "run",
@@ -198,39 +121,73 @@ def _build_e2e_command(project_dir: pathlib.Path) -> list[str]:
     ]
 
 
-def run_yolo(
+# kept for backwards-compatibility with tests and run_review.py
+def build_command(
     project_dir: pathlib.Path,
     home_dir: pathlib.Path,
-    spec_path: pathlib.Path | None,
+    extra_args: list[str],
+) -> list[str]:
+    return build_docker_command(project_dir, home_dir, extra_args)
+
+
+# ── runners ──────────────────────────────────────────────────────────────────
+
+
+def run_explore(extra_args: list[str], dry_run: bool) -> None:
+    """Run Claude on the host with read-only permissions — no Docker required."""
+    cmd = ["claude"] + extra_args
+    if dry_run:
+        print(f"[writes {SETTINGS_LOCAL}]")
+        print(" ".join(cmd))
+        print(f"[deletes {SETTINGS_LOCAL}]")
+        return
+    SETTINGS_LOCAL.write_text(json.dumps(EXPLORE_PERMISSIONS, indent=2))
+    try:
+        subprocess.run(cmd, check=False)
+    finally:
+        if SETTINGS_LOCAL.exists():
+            SETTINGS_LOCAL.unlink()
+
+
+def run_implement(
+    project_dir: pathlib.Path,
+    home_dir: pathlib.Path,
+    spec: pathlib.Path | None,
+    review: bool,
     extra_args: list[str],
     dry_run: bool,
 ) -> None:
     container_cmd = build_docker_command(project_dir, home_dir, extra_args)
-    e2e_cmd = _build_e2e_command(project_dir)
-    review_cmd = [_PY, "scripts/run_review.py"]
-    if spec_path:
-        review_cmd += ["--spec", spec_path.as_posix()]
 
     if dry_run:
         print("# Step 1 — container session")
         print(" ".join(container_cmd))
-        print("# Step 2 — E2E smoke tests (inside container — ffmpeg + Playwright available)")
-        print(" ".join(e2e_cmd))
-        print("# Step 3 — review pipeline")
-        print(" ".join(review_cmd))
+        if review:
+            e2e_cmd = _build_e2e_command(project_dir)
+            review_cmd = [_PY, "scripts/run_review.py"]
+            if spec:
+                review_cmd += ["--spec", spec.as_posix()]
+            print("# Step 2 — E2E smoke tests (inside container)")
+            print(" ".join(e2e_cmd))
+            print("# Step 3 — review pipeline")
+            print(" ".join(review_cmd))
         return
 
-    print("\n[yolo] starting container session...")
+    print("\n[implement] starting container session...")
     subprocess.run(container_cmd, check=False)
 
-    print("\n[yolo] container exited — running E2E smoke tests in container...")
-    e2e_result = subprocess.run(e2e_cmd, check=False)
+    if review:
+        print("\n[implement] running E2E smoke tests...")
+        e2e_result = subprocess.run(_build_e2e_command(project_dir), check=False)
 
-    print("\n[yolo] running review pipeline...")
-    subprocess.run(review_cmd, check=False)
+        review_cmd = [_PY, "scripts/run_review.py"]
+        if spec:
+            review_cmd += ["--spec", spec.as_posix()]
+        print("\n[implement] running review pipeline...")
+        subprocess.run(review_cmd, check=False)
 
-    if e2e_result.returncode != 0:
-        print("\n[yolo] WARNING: E2E tests had failures — review findings carefully")
+        if e2e_result.returncode != 0:
+            print("\n[implement] WARNING: E2E tests had failures — review findings carefully")
 
 
 # ── version-level execution ──────────────────────────────────────────────────
@@ -300,6 +257,7 @@ def run_yolo_version(
     project_dir: pathlib.Path,
     home_dir: pathlib.Path,
     version: str,
+    review: bool,
     extra_args: list[str],
     dry_run: bool,
 ) -> None:
@@ -321,9 +279,10 @@ def run_yolo_version(
             duration_s = time.monotonic() - t0
             results.append(SpecResult(spec.stem, "FAILED", duration_s, branch))
             continue
-        run_yolo(project_dir, home_dir, spec_path=spec, extra_args=extra_args, dry_run=dry_run)
+        run_implement(
+            project_dir, home_dir, spec=spec, review=review, extra_args=extra_args, dry_run=dry_run
+        )
         duration_s = time.monotonic() - t0
-
         results.append(SpecResult(spec.stem, "DONE", duration_s, branch))
 
     _print_version_report(results, version)
@@ -332,8 +291,12 @@ def run_yolo_version(
 # ── CLI ──────────────────────────────────────────────────────────────────────
 
 
-def _parse(argv: list[str]) -> tuple[str, bool, pathlib.Path | None, str | None, list[str]]:
-    mode = "supervised"
+def _parse(
+    argv: list[str],
+) -> tuple[bool, bool, bool, pathlib.Path | None, str | None, list[str]]:
+    # returns: explore, review, dry_run, spec, version, rest
+    explore = False
+    review = False
     dry_run = False
     spec = None
     version: str | None = None
@@ -342,11 +305,11 @@ def _parse(argv: list[str]) -> tuple[str, bool, pathlib.Path | None, str | None,
     i = 0
     while i < len(argv):
         arg = argv[i]
-        if arg == "--mode" and i + 1 < len(argv):
-            mode = argv[i + 1]
-            i += 2
-        elif arg.startswith("--mode="):
-            mode = arg.split("=", 1)[1]
+        if arg == "--explore":
+            explore = True
+            i += 1
+        elif arg == "--review":
+            review = True
             i += 1
         elif arg == "--dry-run":
             dry_run = True
@@ -367,49 +330,36 @@ def _parse(argv: list[str]) -> tuple[str, bool, pathlib.Path | None, str | None,
             rest.append(arg)
             i += 1
 
-    if mode not in MODES:
-        print(f"error: unknown mode '{mode}'. choose from: {', '.join(MODES)}")
-        sys.exit(1)
-
     if spec is not None and version is not None:
         print("error: --version and --spec are mutually exclusive")
         sys.exit(1)
 
-    if version is not None:
-        mode = "yolo"
-
-    return mode, dry_run, spec, version, rest
+    return explore, review, dry_run, spec, version, rest
 
 
 def main(argv: list[str] | None = None) -> None:
     if argv is None:
         argv = sys.argv[1:]
-    # Ensure Unicode output works on Windows terminals (cp1252 → utf-8)
+    # Ensure Unicode output works on Windows terminals (cp1252 -> utf-8)
     if hasattr(sys.stdout, "reconfigure"):
         try:
             sys.stdout.reconfigure(encoding="utf-8")
         except Exception:
             pass
 
-    mode, dry_run, spec, version, extra = _parse(argv)
+    explore, review, dry_run, spec, version, extra = _parse(argv)
     project_dir = pathlib.Path.cwd()
     home_dir = pathlib.Path.home()
 
-    if version:
-        run_yolo_version(project_dir, home_dir, version, extra, dry_run)
+    if explore:
+        run_explore(extra, dry_run)
         return
 
-    if not dry_run:
-        _print_banner(mode)
+    if version:
+        run_yolo_version(project_dir, home_dir, version, review, extra, dry_run)
+        return
 
-    if mode == "supervised":
-        run_supervised(extra, dry_run)
-    elif mode == "assisted":
-        run_assisted(extra, dry_run)
-    elif mode == "container":
-        run_container(project_dir, home_dir, extra, dry_run)
-    elif mode == "yolo":
-        run_yolo(project_dir, home_dir, spec, extra, dry_run)
+    run_implement(project_dir, home_dir, spec, review, extra, dry_run)
 
 
 if __name__ == "__main__":
