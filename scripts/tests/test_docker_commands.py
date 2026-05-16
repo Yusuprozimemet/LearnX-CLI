@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from scripts.learnx_dk import (
+from scripts.devloop import (
     _build_e2e_command,
     _load_config,
     build_command,

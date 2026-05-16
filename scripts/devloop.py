@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-learnx_dk.py — Claude Code launcher for LearnX.
+devloop.py — DevLoop launcher for LearnX.
 
 Usage:
-    python scripts/learnx_dk.py [--explore] [--review] [--dry-run] [--spec PATH]
+    python scripts/devloop.py [--explore] [--review] [--dry-run] [--spec PATH]
 
 Flags:
     (none)      Docker container session (default — zero prompts)
@@ -12,11 +12,11 @@ Flags:
     --version V Run all specs in specs/V/ sequentially
 
 Examples:
-    python scripts/learnx_dk.py                              # Docker (default)
-    python scripts/learnx_dk.py --explore
-    python scripts/learnx_dk.py --spec specs/v5/day18.md --review
-    python scripts/learnx_dk.py --version v5 --review
-    python scripts/learnx_dk.py --dry-run
+    python scripts/devloop.py                              # Docker (default)
+    python scripts/devloop.py --explore
+    python scripts/devloop.py --spec specs/v5/day18.md --review
+    python scripts/devloop.py --version v5 --review
+    python scripts/devloop.py --dry-run
 """
 
 import os

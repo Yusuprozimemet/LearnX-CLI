@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from scripts.learnx_dk import _DEFAULTS
+from scripts.devloop import _DEFAULTS
 from scripts.run_review import (
     PHASE_1_FIX_ADDENDUM,
     PHASE_2_PROMPT_TEMPLATE,

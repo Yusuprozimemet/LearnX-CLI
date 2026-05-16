@@ -1,4 +1,4 @@
-# devloop.toml — project config for the learnx_dk.py dev loop
+# devloop.toml — project config for the devloop.py dev loop
 # Edit this file to adapt the loop to a different project.
 
 [project]

@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from scripts.learnx_dk import (
+from scripts.devloop import (
     _DEFAULTS,
     Notifier,
     SpecResult,
@@ -154,8 +154,8 @@ def test_main_calls_notifier_after_run_implement(tmp_path):
     (tmp_path / "devloop.toml").write_text(toml_content)
 
     with (
-        patch("scripts.learnx_dk.pathlib.Path.cwd", return_value=tmp_path),
-        patch("scripts.learnx_dk.run_implement"),
+        patch("scripts.devloop.pathlib.Path.cwd", return_value=tmp_path),
+        patch("scripts.devloop.run_implement"),
         patch("scripts.dk.notifier.Notifier.send") as mock_send,
     ):
         main([])

@@ -226,7 +226,7 @@ it just means the session runs longer before you need to check in.
 ### Level 4 — Autonomous session via Docker container (the goal state)
 
 ```
-You: python scripts/learnx_dk.py
+You: python scripts/devloop.py
      [paste handoff prompt inside the container session]
      [walk away]
 Claude: [implements → runs python -m pytest → reads output → fixes → runs again → reports]

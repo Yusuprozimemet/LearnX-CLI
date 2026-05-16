@@ -45,7 +45,7 @@ git checkout main
 git checkout -b sandbox/dayN
 
 # 2. Start the agent inside the container
-python scripts/learnx_dk.py
+python scripts/devloop.py
 
 # 3. Give the handoff prompt (see handoff_template.md container section)
 # Agent implements → runs python -m pytest → fixes → reports done
@@ -99,7 +99,7 @@ container on the next run.
 |---------|-------------|-----|
 | `claude: command not found` | Image not rebuilt after npm install step | `docker build -t learnx-dev .` |
 | Tests pass on host, fail in container | Missing dependency in requirements.txt | Add to `tutor/requirements.txt`, rebuild |
-| `Permission denied` on mounted files | UID mismatch on Linux host | Add `--user $(id -u)` to docker run call in `learnx_dk.py` |
+| `Permission denied` on mounted files | UID mismatch on Linux host | Add `--user $(id -u)` to docker run call in `devloop.py` |
 | `git push` succeeds inside container | Remote was configured inside container | Check `.git/config` inside container; remove remote |
-| `audioop-lts` install fails in image | Package only exists for Python 3.13+ | Already handled — see `dev_setup_update/fixes/fix001.md` |
+| `audioop-lts` install fails in image | Package only exists for Python 3.13+ | Already handled — see `fixes/fix001.md` |
 | Playwright browser not found | Browser binary not in image | Rebuild image — `playwright install chromium` runs at build time |

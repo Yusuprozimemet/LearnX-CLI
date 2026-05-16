@@ -21,7 +21,7 @@ _ROOT = pathlib.Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from scripts.learnx_dk import _load_config, build_command  # noqa: E402, I001
+from scripts.devloop import _load_config, build_command  # noqa: E402, I001
 
 
 REVIEW_PROMPT_TEMPLATE = """

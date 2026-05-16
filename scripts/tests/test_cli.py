@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from scripts.learnx_dk import (
+from scripts.devloop import (
     EXPLORE_PERMISSIONS,
     _parse,
     main,
@@ -19,8 +19,8 @@ from scripts.learnx_dk import (
 def test_dry_run_prints_command_no_subprocess(dirs, capsys):
     project, home = dirs
     with (
-        patch("scripts.learnx_dk.pathlib.Path.cwd", return_value=project),
-        patch("scripts.learnx_dk.pathlib.Path.home", return_value=home),
+        patch("scripts.devloop.pathlib.Path.cwd", return_value=project),
+        patch("scripts.devloop.pathlib.Path.home", return_value=home),
         patch("scripts.dk.runners.subprocess.run") as mock_run,
     ):
         main(["--dry-run"])
@@ -32,8 +32,8 @@ def test_dry_run_prints_command_no_subprocess(dirs, capsys):
 def test_default_dry_run_uses_docker(dirs, capsys):
     project, home = dirs
     with (
-        patch("scripts.learnx_dk.pathlib.Path.cwd", return_value=project),
-        patch("scripts.learnx_dk.pathlib.Path.home", return_value=home),
+        patch("scripts.devloop.pathlib.Path.cwd", return_value=project),
+        patch("scripts.devloop.pathlib.Path.home", return_value=home),
         patch("scripts.dk.runners.subprocess.run") as mock_run,
     ):
         main(["--dry-run"])
@@ -45,8 +45,8 @@ def test_default_dry_run_uses_docker(dirs, capsys):
 def test_default_dry_run_prints_docker_command(dirs, capsys):
     project, home = dirs
     with (
-        patch("scripts.learnx_dk.pathlib.Path.cwd", return_value=project),
-        patch("scripts.learnx_dk.pathlib.Path.home", return_value=home),
+        patch("scripts.devloop.pathlib.Path.cwd", return_value=project),
+        patch("scripts.devloop.pathlib.Path.home", return_value=home),
         patch("scripts.dk.runners.subprocess.run") as mock_run,
     ):
         main(["--dry-run"])

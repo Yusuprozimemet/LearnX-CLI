@@ -12,7 +12,7 @@ Use this when you want uninterrupted autonomous execution.
 
 1. Start the container session:
    ```powershell
-   python scripts/learnx_dk.py
+   python scripts/devloop.py
    ```
 
 2. Paste this prompt inside the container Claude session:

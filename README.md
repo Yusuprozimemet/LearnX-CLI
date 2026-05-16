@@ -38,8 +38,14 @@ LearnX > /help                  # all commands
 
 ## How it was built
 
-Spec-driven development — every feature started as a written specification before
-any code was written. 16 spec days across v0–v3. Full spec chain in [`specs/`](specs/).
+Two layers share this repository:
+
+- **LearnX CLI** (`tutor/`) — the product. Audio tutorial generator.
+- **DevLoop** (`scripts/`) — the build system. Runs Claude in Docker, manages the spec-driven development loop, orchestrates a 5-agent review pipeline.
+
+Spec-driven development — every feature started as a written specification before any
+code was written. 31 spec days across v0–v11. Full spec chain in [`specs/`](specs/).
+Full workflow documentation in [`DEVLOOP.md`](DEVLOOP.md).
 
 <p align="center">
   <img src="agile.png" alt="Dev loop" />
@@ -52,11 +58,12 @@ any code was written. 16 spec days across v0–v3. Full spec chain in [`specs/`]
 Each spec day follows this loop:
 
 ```
-write spec → create branch → run yolo → read report → merge
+write spec → create branch → devloop launch → review report → merge
 ```
 
-Everything runs through one launcher script. Claude implements the spec inside a
-Docker container, then E2E tests and a 5-agent review run automatically.
+Claude implements the spec inside a Docker container. When it exits, E2E tests and a
+two-phase 5-agent review run automatically. Phase 1 discovers issues and applies fixes;
+Phase 2 verifies resolution.
 
 ---
 
@@ -110,39 +117,35 @@ git checkout main
 git checkout -b sandbox/dayN
 ```
 
-Replace `dayN` with the actual day number (e.g. `day18`).
+Replace `dayN` with the actual day number (e.g. `day32`).
 
 ### Step 4 — Dry run
 
 ```powershell
-python scripts/learnx_dk.py --spec specs/v5/dayN.md --review --dry-run
+python scripts/devloop.py --spec specs/v11/dayN.md --review --dry-run
 ```
 
-Prints the 3 commands that will run without executing anything. Check it looks right.
+Prints the commands that will run without executing anything. Check it looks right.
 
 ### Step 5 — Launch
 
 ```powershell
-python scripts/learnx_dk.py --spec specs/v5/dayN.md --review
+python scripts/devloop.py --spec specs/v11/dayN.md --review
 ```
 
-Claude Code opens inside the container. When you see the `>` prompt, paste:
-
-```
-Read specs/v4/dayN.md completely before writing any code.
-Branch sandbox/dayN is already created on the host.
-Implement exactly what the spec says. Run the merge gate when done and report.
-```
+Claude Code opens inside the container. When you see the `>` prompt, paste the
+handoff from [`dev_setup/handoff_template.md`](dev_setup/handoff_template.md).
 
 Then walk away.
 
 ### Step 6 — What happens automatically
 
-After Claude finishes and you see its report, it exits the container. Then automatically:
+After Claude finishes and exits the container:
 
 1. **E2E smoke tests** run inside the container (ffmpeg + Playwright available)
-2. **5-agent review** runs — code quality, spec compliance, test coverage, simplification
-3. A consolidated report prints with `MERGE READY` or `NEEDS FIXES`
+2. **Phase 1 review** — 3 agents discover issues and apply fixes
+3. **Phase 2 review** — 2 agents verify the fixes and check for regressions
+4. A consolidated report prints with `MERGE READY` or `NEEDS FIXES`
 
 ### Step 7 — After the report
 
@@ -151,16 +154,13 @@ If `MERGE READY`:
 ```powershell
 git checkout main
 git pull origin main
-gh pr create --title "fix(dayN): ..." --body "..."
-# or merge directly:
-git merge sandbox/dayN
-git push origin main
+gh pr create --title "dayN: ..." --body "..."
 ```
 
 If `NEEDS FIXES`: read the findings, fix the issues, re-run the merge gate:
 
 ```powershell
-python -m pytest tutor/tests/ --ignore=tutor/tests/e2e/ -m "not slow" -v
+python -m pytest tutor/tests/ --ignore=tutor/tests/e2e/ -v
 python -m ruff check tutor/
 ```
 
@@ -172,17 +172,26 @@ Docker is the default. Always.
 
 | Command | Effect |
 |---|---|
-| `python scripts/learnx_dk.py` | Docker container — implement, no review |
-| `python scripts/learnx_dk.py --spec X` | Docker — implement spec X, no review |
-| `python scripts/learnx_dk.py --spec X --review` | Docker — implement X, then E2E + review |
-| `python scripts/learnx_dk.py --version v5 --review` | Docker — run all v5 specs with review |
-| `python scripts/learnx_dk.py --explore` | Host only — questions, no code changes |
+| `python scripts/devloop.py --spec X` | Docker — implement spec X, no review |
+| `python scripts/devloop.py --spec X --review` | Docker — implement X, then E2E + two-phase review |
+| `python scripts/devloop.py --version vN --review` | Docker — run all specs in vN sequentially with review |
+| `python scripts/devloop.py --version vN --serve` | Same, with live dashboard at localhost:8080 |
+| `python scripts/devloop.py --explore` | Host only — read-only, no code changes |
+| `python scripts/devloop.py --dry-run` | Print commands without executing |
 
-`--explore` starts Claude on the host with read-only permissions (Read, Grep, Glob,
+**`--version`** runs every spec in `specs/vN/` in day-number order. Each spec gets
+its own sandbox branch (`sandbox/vN-dayN`). Rate-limit retries and session/idle
+timeouts are handled automatically.
+
+**`--serve`** (with `--version`) starts a dashboard at `http://localhost:8080` showing
+live container output and per-spec status as the run progresses. Port is configurable
+via `--port N` or `LEARNX_DASHBOARD_PORT` env var or `devloop.toml`.
+
+**`--explore`** starts Claude on the host with read-only permissions (Read, Grep, Glob,
 git read commands). Use it to ask questions about the codebase without risking
 accidental edits.
 
-> Always use forward slashes in `--spec`: `specs/v5/day1.md` not `specs\v5\day1.md`.
+> Always use forward slashes in `--spec`: `specs/v11/day1.md` not `specs\v11\day1.md`.
 > Backslashes corrupt the path (`\v` is a vertical-tab character).
 
 ---

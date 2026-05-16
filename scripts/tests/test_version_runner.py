@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from scripts.learnx_dk import (
+from scripts.devloop import (
     SpecResult,
     _checkout_spec_branch,
     _discover_specs,
@@ -149,9 +149,9 @@ def test_wait_zero_overrides_config_default(dirs):
     """--wait 0 must pass rate_limit_wait_s=0.0, not fall back to config default."""
     project, home = dirs
     with (
-        patch("scripts.learnx_dk.pathlib.Path.cwd", return_value=project),
-        patch("scripts.learnx_dk.pathlib.Path.home", return_value=home),
-        patch("scripts.learnx_dk.run_yolo_version") as mock_yolo,
+        patch("scripts.devloop.pathlib.Path.cwd", return_value=project),
+        patch("scripts.devloop.pathlib.Path.home", return_value=home),
+        patch("scripts.devloop.run_yolo_version") as mock_yolo,
     ):
         main(["--version", "v5", "--wait", "0"])
     call_kwargs = mock_yolo.call_args.kwargs

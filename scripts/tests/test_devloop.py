@@ -5,7 +5,7 @@ import sys
 import threading
 from unittest.mock import patch
 
-from scripts.learnx_dk import (
+from scripts.devloop import (
     _DEFAULTS,
     DashboardServer,
     OutputBuffer,
@@ -130,10 +130,10 @@ def test_serve_flag_consumed_from_extra(dirs, capsys):
     """--serve must not be forwarded to Claude as an extra arg."""
     project, home = dirs
     with (
-        patch("scripts.learnx_dk.pathlib.Path.cwd", return_value=project),
-        patch("scripts.learnx_dk.pathlib.Path.home", return_value=home),
-        patch("scripts.learnx_dk._load_config", return_value=_DEFAULTS),
-        patch("scripts.learnx_dk.run_implement") as mock_impl,
+        patch("scripts.devloop.pathlib.Path.cwd", return_value=project),
+        patch("scripts.devloop.pathlib.Path.home", return_value=home),
+        patch("scripts.devloop._load_config", return_value=_DEFAULTS),
+        patch("scripts.devloop.run_implement") as mock_impl,
     ):
         main(["--serve", "--dry-run"])
     mock_impl.assert_called_once()
@@ -148,10 +148,10 @@ def test_port_flag_consumed_from_extra(dirs, capsys):
     """--port N must not be forwarded to Claude."""
     project, home = dirs
     with (
-        patch("scripts.learnx_dk.pathlib.Path.cwd", return_value=project),
-        patch("scripts.learnx_dk.pathlib.Path.home", return_value=home),
-        patch("scripts.learnx_dk._load_config", return_value=_DEFAULTS),
-        patch("scripts.learnx_dk.run_implement") as mock_impl,
+        patch("scripts.devloop.pathlib.Path.cwd", return_value=project),
+        patch("scripts.devloop.pathlib.Path.home", return_value=home),
+        patch("scripts.devloop._load_config", return_value=_DEFAULTS),
+        patch("scripts.devloop.run_implement") as mock_impl,
     ):
         main(["--port", "9090", "--dry-run"])
     mock_impl.assert_called_once()
