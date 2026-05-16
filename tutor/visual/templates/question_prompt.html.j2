@@ -1,4 +1,7 @@
 {% extends "_base.html.j2" %}
+{% block extra_style %}:root { --type-accent: var(--amber); }{% endblock %}
+{% block top_bar %}{% endblock %}
+{% block footer %}{% endblock %}
 {% block content %}
 <div class="question-slide">
   {% set speaker = seg.title.split(':')[0].strip().upper() if seg.title and ':' in seg.title else 'MAYA' %}

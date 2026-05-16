@@ -147,6 +147,11 @@ def test_screenshot_uses_file_url_not_set_content(tmp_path: Path) -> None:
     mock_page = MagicMock()
     out = tmp_path / "out.png"
 
+    def fake_screenshot(**kwargs: object) -> None:
+        out.write_bytes(b"PNG" + b"\x00" * 6000)
+
+    mock_page.screenshot.side_effect = fake_screenshot
+
     with (
         patch("tutor.visual.slide_renderer.tempfile.NamedTemporaryFile") as mock_ntf,
         patch("tutor.visual.slide_renderer.os.unlink"),
@@ -176,6 +181,11 @@ def test_tmp_file_cleaned_up_after_screenshot(tmp_path: Path) -> None:
     mock_page = MagicMock()
     out = tmp_path / "out.png"
 
+    def fake_screenshot(**kwargs: object) -> None:
+        out.write_bytes(b"PNG" + b"\x00" * 6000)
+
+    mock_page.screenshot.side_effect = fake_screenshot
+
     original_unlink = os.unlink
 
     def tracking_unlink(path: str) -> None:
@@ -196,6 +206,79 @@ def test_tmp_file_cleaned_up_after_screenshot(tmp_path: Path) -> None:
 
     assert len(recorded) == 1
     assert recorded[0].endswith(".html")
+
+
+# ── Hardening tests (Day 4) ───────────────────────────────────────────────────
+
+
+def test_fallback_segment_reclassifies_to_key_insight() -> None:
+    from tutor.visual.slide_renderer import _fallback_segment
+
+    seg = _make_seg(visual_type="diagram", mermaid="classDiagram\n  A <|-- B")
+    result = _fallback_segment(seg)
+    assert result.visual_type == "key_insight"
+    assert result.mermaid is None
+    assert result.body is not None
+
+
+def test_fallback_segment_preserves_body_when_present() -> None:
+    from tutor.visual.slide_renderer import _fallback_segment
+
+    seg = _make_seg(body="Animal is a base class")
+    result = _fallback_segment(seg)
+    assert result.body == "Animal is a base class"
+
+
+def test_fallback_segment_uses_title_when_body_is_none() -> None:
+    from tutor.visual.slide_renderer import _fallback_segment
+
+    seg = _make_seg(title="Class hierarchy", body=None)
+    result = _fallback_segment(seg)
+    assert "Class hierarchy" in result.body  # type: ignore[operator]
+
+
+def test_min_png_bytes_constant() -> None:
+    from tutor.visual.slide_renderer import _MIN_PNG_BYTES
+
+    assert _MIN_PNG_BYTES == 5_120
+
+
+def test_screenshot_raises_on_small_file(tmp_path: Path) -> None:
+    """_screenshot raises RuntimeError when the output PNG is below the size threshold."""
+    from unittest.mock import MagicMock
+
+    from tutor.visual.slide_renderer import _screenshot
+
+    output = tmp_path / "test.png"
+    output.write_bytes(b"X")  # 1 byte — below threshold
+
+    mock_page = MagicMock()
+
+    with pytest.raises(RuntimeError, match="too small"):
+        _screenshot(
+            mock_page, "<html><body>test</body></html>", output, wait_mermaid=False, wait_hljs=False
+        )
+
+
+def test_screenshot_goto_retries_once_on_failure(tmp_path: Path) -> None:
+    """page.goto() is retried once before raising on persistent failure."""
+    from unittest.mock import MagicMock
+
+    from tutor.visual.slide_renderer import _screenshot
+
+    output = tmp_path / "out.png"
+    mock_page = MagicMock()
+    mock_page.goto.side_effect = [RuntimeError("connection reset"), None]
+
+    def fake_screenshot(**kwargs: object) -> None:
+        output.write_bytes(b"PNG" + b"\x00" * 6000)
+
+    mock_page.screenshot.side_effect = fake_screenshot
+
+    _screenshot(
+        mock_page, "<html><body>test</body></html>", output, wait_mermaid=False, wait_hljs=False
+    )
+    assert mock_page.goto.call_count == 2
 
 
 @pytest.mark.slow

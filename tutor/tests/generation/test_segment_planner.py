@@ -163,6 +163,128 @@ def test_no_cache_forces_regeneration(tmp_path):
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# New types: step_sequence and callout
+# ---------------------------------------------------------------------------
+
+
+def test_step_sequence_in_valid_types():
+    from tutor.models import VALID_VISUAL_TYPES
+
+    assert "step_sequence" in VALID_VISUAL_TYPES
+
+
+def test_callout_in_valid_types():
+    from tutor.models import VALID_VISUAL_TYPES
+
+    assert "callout" in VALID_VISUAL_TYPES
+
+
+def test_step_sequence_fallback_on_empty_body(caplog):
+    """step_sequence with empty body is reclassified to definition."""
+    import logging
+
+    from tutor.generation.segment_parser import _validate_segment
+    from tutor.models import SlideSegment
+
+    seg = SlideSegment(
+        unit_index=1,
+        segment_index=0,
+        lines_start=0,
+        lines_end=1,
+        visual_type="step_sequence",
+        title="Steps to deploy",
+        body=None,
+        code=None,
+        language=None,
+        mermaid=None,
+        left=None,
+        right=None,
+        rows=None,
+    )
+    with caplog.at_level(logging.WARNING):
+        result = _validate_segment(seg)
+    assert result.visual_type == "definition"
+    assert "step_sequence" in caplog.text
+    assert "body is empty" in caplog.text
+
+
+def test_callout_fallback_on_empty_body(caplog):
+    """callout with empty body is reclassified to key_insight."""
+    import logging
+
+    from tutor.generation.segment_parser import _validate_segment
+    from tutor.models import SlideSegment
+
+    seg = SlideSegment(
+        unit_index=1,
+        segment_index=0,
+        lines_start=0,
+        lines_end=1,
+        visual_type="callout",
+        title="WARNING",
+        body=None,
+        code=None,
+        language=None,
+        mermaid=None,
+        left=None,
+        right=None,
+        rows=None,
+    )
+    with caplog.at_level(logging.WARNING):
+        result = _validate_segment(seg)
+    assert result.visual_type == "key_insight"
+    assert "callout" in caplog.text
+
+
+def test_valid_step_sequence_passes_validation():
+    """step_sequence with body is accepted without reclassification."""
+    from tutor.generation.segment_parser import _validate_segment
+    from tutor.models import SlideSegment
+
+    seg = SlideSegment(
+        unit_index=1,
+        segment_index=0,
+        lines_start=0,
+        lines_end=2,
+        visual_type="step_sequence",
+        title="How to deploy",
+        body="Open the terminal\nRun the build script\nPush to staging",
+        code=None,
+        language=None,
+        mermaid=None,
+        left=None,
+        right=None,
+        rows=None,
+    )
+    result = _validate_segment(seg)
+    assert result.visual_type == "step_sequence"
+
+
+def test_valid_callout_passes_validation():
+    """callout with title and body is accepted without reclassification."""
+    from tutor.generation.segment_parser import _validate_segment
+    from tutor.models import SlideSegment
+
+    seg = SlideSegment(
+        unit_index=1,
+        segment_index=0,
+        lines_start=4,
+        lines_end=5,
+        visual_type="callout",
+        title="TIP",
+        body="Always run the linter before committing — it catches 80% of review feedback.",
+        code=None,
+        language=None,
+        mermaid=None,
+        left=None,
+        right=None,
+        rows=None,
+    )
+    result = _validate_segment(seg)
+    assert result.visual_type == "callout"
+
+
 def test_visual_planner_plan_visuals_still_callable(tmp_path):
     from dataclasses import asdict as _asdict
 

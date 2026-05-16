@@ -1,11 +1,13 @@
 {% extends "_base.html.j2" %}
+{% block extra_style %}:root { --type-accent: var(--orange); }{% endblock %}
 {% block content %}
+{% if seg.rows %}
 <div class="comparison-slide">
   <table class="comparison-table">
     <thead>
       <tr>
-        <th class="th-left">{{ seg.left | default('') | e }}</th>
-        <th class="th-right">{{ seg.right | default('') | e }}</th>
+        <th class="th-left">{{ seg.left | default('Use when') | e }}</th>
+        <th class="th-right">{{ seg.right | default('Avoid when') | e }}</th>
       </tr>
     </thead>
     <tbody>
@@ -24,4 +26,12 @@
     </tbody>
   </table>
 </div>
+{% else %}
+<div class="definition-slide">
+  <div class="definition-term">{{ seg.title | e }}</div>
+  {% if seg.body %}
+  <div class="definition-text">{{ seg.body | e }}</div>
+  {% endif %}
+</div>
+{% endif %}
 {% endblock %}

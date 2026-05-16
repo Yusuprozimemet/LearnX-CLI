@@ -1,7 +1,9 @@
 {% extends "_base.html.j2" %}
+{% block extra_style %}:root { --type-accent: var(--pink); }{% endblock %}
 {% block content %}
 <div class="key-insight-slide">
-  <p class="key-insight-text">{{ seg.body | e if seg.body else seg.title | e }}</p>
+  <div class="key-insight-rule"></div>
+  <div class="key-insight-text">{{ seg.body | e if seg.body else seg.title | e }}</div>
   <div class="key-insight-rule"></div>
 </div>
 {% endblock %}

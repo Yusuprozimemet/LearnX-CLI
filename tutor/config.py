@@ -86,12 +86,15 @@ def _check_ffmpeg() -> None:
 
     # PATH doesn't have ffmpeg — probe common Windows install layouts.
     if sys.platform == "win32":
+        _winget_pkgs = Path.home() / "AppData/Local/Microsoft/WinGet/Packages"
         candidates: list[Path] = [
             Path("C:/ffmpeg/bin/ffmpeg.exe"),
             *Path("C:/ffmpeg").glob("*/bin/ffmpeg.exe"),
             Path("C:/Program Files/ffmpeg/bin/ffmpeg.exe"),
             *Path("C:/Program Files/ffmpeg").glob("*/bin/ffmpeg.exe"),
             Path("C:/tools/ffmpeg/bin/ffmpeg.exe"),
+            *(_winget_pkgs.glob("Gyan.FFmpeg*/*/bin/ffmpeg.exe") if _winget_pkgs.exists() else []),
+            *(_winget_pkgs.glob("*/ffmpeg*/bin/ffmpeg.exe") if _winget_pkgs.exists() else []),
         ]
         for candidate in candidates:
             if candidate.exists():
