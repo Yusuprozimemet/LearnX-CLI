@@ -5,15 +5,15 @@ import pytest
 
 from scripts.learnx_dk import (
     ASSISTED_PERMISSIONS,
-    SETTINGS_LOCAL,
+    _discover_specs,
     _parse,
     build_command,
-    build_docker_command,
     main,
     run_assisted,
     run_container,
     run_supervised,
     run_yolo,
+    run_yolo_version,
 )
 
 
@@ -27,6 +27,7 @@ def dirs(tmp_path):
 
 
 # ── Day 2 tests (unchanged) ──────────────────────────────────────────────────
+
 
 def test_command_contains_skip_permissions(dirs):
     project, home = dirs
@@ -67,9 +68,11 @@ def test_command_omits_claude_mount_when_absent(dirs):
 def test_dry_run_prints_command_no_subprocess(dirs, capsys):
     # Default mode is supervised — dry-run prints the host claude command, not docker.
     project, home = dirs
-    with patch("scripts.learnx_dk.pathlib.Path.cwd", return_value=project), \
-         patch("scripts.learnx_dk.pathlib.Path.home", return_value=home), \
-         patch("scripts.learnx_dk.subprocess.run") as mock_run:
+    with (
+        patch("scripts.learnx_dk.pathlib.Path.cwd", return_value=project),
+        patch("scripts.learnx_dk.pathlib.Path.home", return_value=home),
+        patch("scripts.learnx_dk.subprocess.run") as mock_run,
+    ):
         main(["--dry-run"])
     out = capsys.readouterr().out
     assert "claude" in out
@@ -78,9 +81,11 @@ def test_dry_run_prints_command_no_subprocess(dirs, capsys):
 
 def test_container_dry_run_prints_docker_command(dirs, capsys):
     project, home = dirs
-    with patch("scripts.learnx_dk.pathlib.Path.cwd", return_value=project), \
-         patch("scripts.learnx_dk.pathlib.Path.home", return_value=home), \
-         patch("scripts.learnx_dk.subprocess.run") as mock_run:
+    with (
+        patch("scripts.learnx_dk.pathlib.Path.cwd", return_value=project),
+        patch("scripts.learnx_dk.pathlib.Path.home", return_value=home),
+        patch("scripts.learnx_dk.subprocess.run") as mock_run,
+    ):
         main(["--mode", "container", "--dry-run"])
     out = capsys.readouterr().out
     assert "docker" in out
@@ -98,11 +103,14 @@ def test_extra_args_forwarded_to_claude(dirs):
 
 # ── Day 2b tests ─────────────────────────────────────────────────────────────
 
+
 def test_default_mode_is_supervised(dirs, capsys):
     project, home = dirs
-    with patch("scripts.learnx_dk.pathlib.Path.cwd", return_value=project), \
-         patch("scripts.learnx_dk.pathlib.Path.home", return_value=home), \
-         patch("scripts.learnx_dk.subprocess.run"):
+    with (
+        patch("scripts.learnx_dk.pathlib.Path.cwd", return_value=project),
+        patch("scripts.learnx_dk.pathlib.Path.home", return_value=home),
+        patch("scripts.learnx_dk.subprocess.run"),
+    ):
         main(["--dry-run"])
     out = capsys.readouterr().out
     assert "claude" in out
@@ -180,5 +188,51 @@ def test_unknown_mode_exits_1():
 
 
 def test_parse_mode_long_form():
-    mode, _, _, _ = _parse(["--mode=container"])
+    mode, _, _, _, _ = _parse(["--mode=container"])
     assert mode == "container"
+
+
+# ── Day 18 (v5) tests ─────────────────────────────────────────────────────────
+
+
+def test_parse_version_flag():
+    _, _, _, version, _ = _parse(["--mode", "yolo", "--version", "v5"])
+    assert version == "v5"
+
+
+def test_parse_version_equals_form():
+    _, _, _, version, _ = _parse(["--version=v5"])
+    assert version == "v5"
+
+
+def test_version_and_spec_mutually_exclusive():
+    with pytest.raises(SystemExit) as exc:
+        _parse(["--version", "v5", "--spec", "specs/v5/day18.md"])
+    assert exc.value.code == 1
+
+
+def test_discover_specs_numeric_sort(tmp_path):
+    ver_dir = tmp_path / "specs" / "v5"
+    ver_dir.mkdir(parents=True)
+    for name in ("day10.md", "day2.md", "day1.md"):
+        (ver_dir / name).write_text(f"# {name}")
+    result = _discover_specs(tmp_path / "specs", "v5")
+    assert [p.name for p in result] == ["day1.md", "day2.md", "day10.md"]
+
+
+def test_discover_specs_missing_dir_exits(tmp_path):
+    with pytest.raises(SystemExit) as exc:
+        _discover_specs(tmp_path / "specs", "v99")
+    assert exc.value.code == 1
+
+
+def test_run_yolo_version_dry_run_prints_each_spec(tmp_path, dirs, capsys):
+    project, home = dirs
+    ver_dir = tmp_path / "specs" / "v5"
+    ver_dir.mkdir(parents=True)
+    (ver_dir / "day1.md").write_text("# day1")
+    (ver_dir / "day2.md").write_text("# day2")
+    run_yolo_version(tmp_path, home, "v5", extra_args=[], dry_run=True)
+    out = capsys.readouterr().out
+    assert "day1.md" in out
+    assert "day2.md" in out

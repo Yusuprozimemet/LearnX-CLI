@@ -21,7 +21,7 @@ _ROOT = pathlib.Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from scripts.learnx_dk import IMAGE, WORKSPACE, _to_posix, build_command  # noqa: E402
+from scripts.learnx_dk import build_command  # noqa: E402, I001
 
 
 REVIEW_PROMPT_TEMPLATE = """
@@ -101,7 +101,7 @@ def main(argv: list[str] | None = None) -> None:
     if "--spec" in remaining:
         idx = remaining.index("--spec")
         spec_path = pathlib.Path(remaining[idx + 1])
-        remaining = remaining[:idx] + remaining[idx + 2:]
+        remaining = remaining[:idx] + remaining[idx + 2 :]
 
     project_dir = pathlib.Path.cwd()
     home_dir = pathlib.Path.home()
