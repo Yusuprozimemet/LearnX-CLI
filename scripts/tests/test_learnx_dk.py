@@ -1,13 +1,18 @@
+import json
 import pathlib
 import sys
+import time
 from unittest.mock import patch
 
 import pytest
 
 from scripts.learnx_dk import (
+    _DEFAULTS,
     EXPLORE_PERMISSIONS,
+    Notifier,
     SpecResult,
     _build_e2e_command,
+    _build_notify_payload,
     _checkout_spec_branch,
     _discover_specs,
     _extract_int_flag,
@@ -490,3 +495,159 @@ def test_wait_zero_overrides_config_default(dirs):
         main(["--version", "v5", "--wait", "0"])
     call_kwargs = mock_yolo.call_args.kwargs
     assert call_kwargs.get("rate_limit_wait_s") == 0.0
+
+
+# ── Day 26 (v9) tests ────────────────────────────────────────────────────────
+
+
+def test_build_notify_payload_structure():
+    results = [
+        SpecResult("day1", "DONE", 60.0, "sandbox/v5-day1"),
+        SpecResult("day2", "FAILED", 30.0, "sandbox/v5-day2"),
+        SpecResult("day3", "TIMED_OUT", 1800.0, "sandbox/v5-day3"),
+    ]
+    start = time.monotonic() - 120  # pretend 2 minutes ago
+    payload = _build_notify_payload("v5", results, "completed", start, _DEFAULTS)
+    assert payload["version"] == "v5"
+    assert payload["specs_total"] == 3
+    assert payload["specs_ready"] == 1
+    assert payload["specs_failed"] == 1
+    assert payload["specs_timed_out"] == 1
+    assert payload["status"] == "completed"
+    assert len(payload["branch_summary"]) == 3
+
+
+def test_notifier_disabled_when_no_channels_configured():
+    n = Notifier({"notify": {}})
+    assert n.enabled() is False
+
+
+def test_notifier_enabled_when_webhook_configured():
+    n = Notifier({"notify": {"webhook_url": "https://example.com/hook"}})
+    assert n.enabled() is True
+
+
+def test_notifier_webhook_posts_json(capsys):
+    n = Notifier({"notify": {"webhook_url": "https://example.com/hook"}})
+    with patch("scripts.learnx_dk.urllib.request.urlopen") as mock_open:
+        n.send({"status": "completed"})
+    mock_open.assert_called_once()
+    req = mock_open.call_args[0][0]
+    body = json.loads(req.data)
+    assert body["status"] == "completed"
+
+
+def test_notifier_webhook_failure_does_not_raise(capsys):
+    n = Notifier({"notify": {"webhook_url": "https://example.com/hook"}})
+    with patch("scripts.learnx_dk.urllib.request.urlopen", side_effect=OSError("no network")):
+        n.send({"status": "completed"})  # must not raise
+    out = capsys.readouterr().out
+    assert "webhook failed" in out
+
+
+def test_notifier_telegram_skips_when_env_unset(capsys, monkeypatch):
+    monkeypatch.delenv("MY_TOKEN", raising=False)
+    n = Notifier({"notify": {"telegram_token_env": "MY_TOKEN", "telegram_chat_id_env": "MY_CHAT"}})
+    n._send_telegram({"status": "completed"})
+    out = capsys.readouterr().out
+    assert "not set" in out
+
+
+def test_format_telegram_success_message():
+    n = Notifier({})
+    payload = {
+        "project": "LearnX",
+        "version": "v5",
+        "specs_total": 5,
+        "specs_ready": 5,
+        "specs_failed": 0,
+        "specs_timed_out": 0,
+        "duration_minutes": 214,
+    }
+    msg = n._format_telegram(payload)
+    assert "✓" in msg
+    assert "v5 complete" in msg
+    assert "3h34m" in msg
+
+
+def test_format_telegram_failure_message():
+    n = Notifier({})
+    payload = {
+        "project": "LearnX",
+        "version": "v5",
+        "specs_total": 5,
+        "specs_ready": 3,
+        "specs_failed": 1,
+        "specs_timed_out": 1,
+        "duration_minutes": 60,
+    }
+    msg = n._format_telegram(payload)
+    assert "✗" in msg
+    assert "NEEDS ATTENTION" in msg
+    assert "1 failed" in msg
+    assert "1 timed out" in msg
+
+
+# ── Day 26 fixes: Notifier.enabled() and notification wiring ─────────────────
+
+
+def test_notifier_enabled_false_with_only_telegram_token():
+    """enabled() must require both token AND chat_id — partial config is not enough."""
+    n = Notifier({"notify": {"telegram_token_env": "MY_TOKEN"}})
+    assert n.enabled() is False
+
+
+def test_run_yolo_version_calls_notifier_on_completion(tmp_path):
+    """run_yolo_version() must call Notifier.send() when a channel is configured."""
+    (tmp_path / "specs" / "v9").mkdir(parents=True)
+    (tmp_path / "specs" / "v9" / "day1.md").write_text("spec")
+
+    config = {
+        **_DEFAULTS,
+        "notify": {"webhook_url": "https://example.com/hook"},
+    }
+
+    with (
+        patch("scripts.learnx_dk._checkout_spec_branch", return_value=True),
+        patch("scripts.learnx_dk._run_with_timeout", return_value=(0, [], False)),
+        patch("scripts.learnx_dk.Notifier.send") as mock_send,
+    ):
+        run_yolo_version(
+            tmp_path,
+            pathlib.Path.home(),
+            "v9",
+            review=False,
+            extra_args=[],
+            dry_run=False,
+            config=config,
+        )
+
+    mock_send.assert_called_once()
+    payload = mock_send.call_args[0][0]
+    assert payload["version"] == "v9"
+    assert payload["status"] == "completed"
+
+
+def test_main_calls_notifier_after_run_implement(tmp_path):
+    """main() must call Notifier.send() after run_implement() when a channel is configured."""
+    toml_content = (
+        "[project]\n"
+        'name = "TestProj"\n'
+        'docker_image = "img"\n'
+        'workspace = "/ws"\n'
+        'specs_dir = "specs"\n'
+        "[notify]\n"
+        'webhook_url = "https://example.com/hook"\n'
+    )
+    (tmp_path / "devloop.toml").write_text(toml_content)
+
+    with (
+        patch("scripts.learnx_dk.pathlib.Path.cwd", return_value=tmp_path),
+        patch("scripts.learnx_dk.run_implement"),
+        patch("scripts.learnx_dk.Notifier.send") as mock_send,
+    ):
+        main([])
+
+    mock_send.assert_called_once()
+    payload = mock_send.call_args[0][0]
+    assert payload["status"] == "completed"
