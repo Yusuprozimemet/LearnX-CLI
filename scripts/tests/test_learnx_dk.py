@@ -1,4 +1,5 @@
 import pathlib
+import sys
 from unittest.mock import patch
 
 import pytest
@@ -9,9 +10,11 @@ from scripts.learnx_dk import (
     _build_e2e_command,
     _checkout_spec_branch,
     _discover_specs,
+    _extract_int_flag,
     _load_config,
     _parse,
     _print_version_report,
+    _run_with_timeout,
     _spec_branch_name,
     build_command,
     build_docker_command,
@@ -158,32 +161,28 @@ def test_build_docker_command_uses_custom_image(dirs):
     assert any("/app" in m for m in mounts)
 
 
-def test_run_yolo_version_forwards_image_to_run_implement(tmp_path, dirs, capsys):
-    """image/workspace from config must reach run_implement, not be hardcoded."""
+def test_run_yolo_version_uses_image_from_config(tmp_path, dirs, capsys):
+    """image/workspace from config must appear in the container command for version runs."""
     project, home = dirs
     ver_dir = tmp_path / "specs" / "v5"
     ver_dir.mkdir(parents=True)
     (ver_dir / "day1.md").write_text("# day1")
 
-    with (
-        patch("scripts.learnx_dk.run_implement") as mock_impl,
-        patch("scripts.learnx_dk._checkout_spec_branch", return_value=True),
-    ):
+    config = {"project": {"docker_image": "custom-img", "workspace": "/custom"}}
+    with patch("scripts.learnx_dk._checkout_spec_branch", return_value=True):
         run_yolo_version(
             tmp_path,
             home,
             "v5",
             review=False,
             extra_args=[],
-            dry_run=False,
-            image="custom-img",
-            workspace="/custom",
+            dry_run=True,
+            config=config,
         )
 
-    mock_impl.assert_called_once()
-    call_kwargs = mock_impl.call_args.kwargs
-    assert call_kwargs.get("image") == "custom-img"
-    assert call_kwargs.get("workspace") == "/custom"
+    out = capsys.readouterr().out
+    assert "custom-img" in out
+    assert "/custom" in out
 
 
 def test_implement_review_dry_run_e2e_uses_custom_image(dirs, capsys):
@@ -388,11 +387,11 @@ def test_run_yolo_version_records_failed_when_checkout_fails(tmp_path, dirs, cap
 
     with (
         patch("scripts.learnx_dk._checkout_spec_branch", return_value=False),
-        patch("scripts.learnx_dk.run_implement") as mock_impl,
+        patch("scripts.learnx_dk._run_with_timeout") as mock_run,
     ):
         run_yolo_version(tmp_path, home, "v5", review=False, extra_args=[], dry_run=False)
 
-    mock_impl.assert_not_called()
+    mock_run.assert_not_called()
     out = capsys.readouterr().out
     assert "FAILED" in out
 
@@ -418,3 +417,39 @@ def test_run_yolo_version_dry_run_shows_branch_names(tmp_path, dirs, capsys):
     run_yolo_version(tmp_path, home, "v5", review=False, extra_args=[], dry_run=True)
     out = capsys.readouterr().out
     assert "sandbox/v5-day1" in out
+
+
+# ── Day 24 (v8) tests ────────────────────────────────────────────────────────
+
+
+def test_extract_int_flag_present():
+    val, rest = _extract_int_flag(["--session-timeout", "45", "--dry-run"], "--session-timeout")
+    assert val == 45
+    assert rest == ["--dry-run"]
+
+
+def test_extract_int_flag_absent():
+    val, rest = _extract_int_flag(["--dry-run"], "--session-timeout")
+    assert val is None
+    assert rest == ["--dry-run"]
+
+
+def test_build_docker_command_omits_it_when_not_interactive(dirs):
+    project, home = dirs
+    cmd = build_docker_command(project, home, extra_args=[], interactive=False)
+    assert "-it" not in cmd
+    assert "-i" not in cmd
+
+
+def test_build_docker_command_includes_it_by_default(dirs):
+    project, home = dirs
+    cmd = build_docker_command(project, home, extra_args=[])
+    assert "-it" in cmd
+
+
+def test_run_with_timeout_kills_on_session_timeout():
+    """Process that runs longer than session_timeout_s must be killed (timed_out=True)."""
+    cmd = [sys.executable, "-c", "import time; time.sleep(60)"]
+    rc, lines, timed_out = _run_with_timeout(cmd, session_timeout_s=2.0, idle_timeout_s=0)
+    assert timed_out is True
+    assert rc != 0

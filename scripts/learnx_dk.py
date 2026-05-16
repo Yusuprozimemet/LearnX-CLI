@@ -26,6 +26,7 @@ import re
 import shlex
 import subprocess
 import sys
+import threading
 import time
 import tomllib
 from dataclasses import dataclass
@@ -49,6 +50,18 @@ _DEFAULTS: dict = {
         "agents_dir": ".claude/agents",
         "review_script": "scripts/run_review.py",
     },
+    "resilience": {
+        "session_timeout_minutes": 30,
+        "idle_timeout_minutes": 5,
+        "rate_limit_wait_minutes": 2,
+        "max_retries_per_spec": 1,
+        "rate_limit_patterns": [
+            "rate limit exceeded",
+            "you've hit your limit",
+            "429 too many requests",
+            "quota exceeded",
+        ],
+    },
 }
 
 
@@ -68,7 +81,7 @@ def _load_config(project_dir: pathlib.Path) -> dict:
 @dataclass
 class SpecResult:
     spec_name: str
-    status: str  # "DONE" | "FAILED"
+    status: str  # "DONE" | "FAILED" | "TIMED_OUT"
     duration_s: float
     branch: str
 
@@ -107,20 +120,17 @@ def build_docker_command(
     extra_args: list[str],
     image: str = IMAGE,
     workspace: str = WORKSPACE,
+    interactive: bool = True,
 ) -> list[str]:
     """Build the docker run command."""
     claude_dir = home_dir / ".claude"
     claude_json = home_dir / ".claude.json"
     gitconfig = home_dir / ".gitconfig"
 
-    cmd = [
-        "docker",
-        "run",
-        "--rm",
-        "-it",
-        "-v",
-        f"{_to_posix(project_dir)}:{workspace}",
-    ]
+    cmd = ["docker", "run", "--rm"]
+    if interactive:
+        cmd.append("-it")
+    cmd += ["-v", f"{_to_posix(project_dir)}:{workspace}"]
     if claude_dir.exists():
         cmd += ["-v", f"{_to_posix(claude_dir)}:/home/dev/.claude:ro"]
         # Claude Code writes session state here; anonymous volume keeps .claude read-only
@@ -170,8 +180,88 @@ def build_command(
     extra_args: list[str],
     image: str = IMAGE,
     workspace: str = WORKSPACE,
+    interactive: bool = True,
 ) -> list[str]:
-    return build_docker_command(project_dir, home_dir, extra_args, image, workspace)
+    return build_docker_command(project_dir, home_dir, extra_args, image, workspace, interactive)
+
+
+def _extract_int_flag(args: list[str], flag: str) -> tuple[int | None, list[str]]:
+    """Pop --flag N from args. Return (int_value_or_None, remaining_args)."""
+    if flag not in args:
+        return None, args
+    idx = args.index(flag)
+    try:
+        val = int(args[idx + 1])
+        return val, args[:idx] + args[idx + 2 :]
+    except (IndexError, ValueError):
+        return None, args
+
+
+def _run_with_timeout(
+    cmd: list[str],
+    session_timeout_s: float,
+    idle_timeout_s: float,
+) -> tuple[int, list[str], bool]:
+    """Run cmd non-interactively with output streaming and two kill triggers.
+
+    Returns:
+        returncode   — process exit code (-9 or similar if killed)
+        last_lines   — last 200 stdout+stderr lines (for rate-limit detection)
+        timed_out    — True if killed by session or idle timeout
+    """
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        bufsize=1,
+    )
+
+    ring: list[str] = []
+    last_output_at = [time.monotonic()]
+    timed_out = [False]
+
+    def _reader() -> None:
+        assert proc.stdout is not None
+        for raw in proc.stdout:
+            line = raw.decode(errors="replace").rstrip()
+            print(line, flush=True)
+            ring.append(line)
+            if len(ring) > 200:
+                ring.pop(0)
+            last_output_at[0] = time.monotonic()
+
+    def _watchdog() -> None:
+        deadline = time.monotonic() + session_timeout_s
+        while proc.poll() is None:
+            now = time.monotonic()
+            if idle_timeout_s > 0 and (now - last_output_at[0]) > idle_timeout_s:
+                print(
+                    f"\n[resilience] idle timeout "
+                    f"({idle_timeout_s / 60:.0f} min) — killing session",
+                    flush=True,
+                )
+                timed_out[0] = True
+                proc.kill()
+                return
+            if now > deadline:
+                print(
+                    f"\n[resilience] session timeout "
+                    f"({session_timeout_s / 60:.0f} min) — killing session",
+                    flush=True,
+                )
+                timed_out[0] = True
+                proc.kill()
+                return
+            time.sleep(2)
+
+    t_read = threading.Thread(target=_reader, daemon=True)
+    t_watch = threading.Thread(target=_watchdog, daemon=True)
+    t_read.start()
+    t_watch.start()
+    proc.wait()
+    t_read.join(timeout=5)
+
+    return proc.returncode, ring, timed_out[0]
 
 
 # ── runners ──────────────────────────────────────────────────────────────────
@@ -298,16 +388,23 @@ def _print_version_report(results: list[SpecResult], version: str) -> None:
     print(f"  {version} Execution Summary")
     print(f"{'-' * width}")
     for r in results:
-        icon = "✓" if r.status == "DONE" else "✗"
+        if r.status == "DONE":
+            icon = "✓"
+        elif r.status == "TIMED_OUT":
+            icon = "⏱"
+        else:
+            icon = "✗"
         mins = int(r.duration_s / 60)
-        print(f"  {r.spec_name:<12}  {icon} {r.status:<8}  {mins} min")
+        print(f"  {r.spec_name:<12}  {icon} {r.status:<10}  {mins} min")
     print(f"{'-' * width}")
     total_mins = int(sum(r.duration_s for r in results) / 60)
     done = sum(1 for r in results if r.status == "DONE")
-    failed = len(results) - done
+    timed_out = sum(1 for r in results if r.status == "TIMED_OUT")
+    failed = len(results) - done - timed_out
     print(
         f"  {len(results)}/{len(results)} specs attempted · "
-        f"{done} done · {failed} failed · Total: {total_mins} min"
+        f"{done} done · {failed} failed · {timed_out} timed out · "
+        f"Total: {total_mins} min"
     )
 
 
@@ -319,8 +416,8 @@ def run_yolo_version(
     extra_args: list[str],
     dry_run: bool,
     specs_dir: str = "specs",
-    image: str = IMAGE,
-    workspace: str = WORKSPACE,
+    session_timeout_s: float = 1800.0,
+    idle_timeout_s: float = 300.0,
     config: dict | None = None,
 ) -> None:
     specs = _discover_specs(project_dir / specs_dir, version)
@@ -331,6 +428,10 @@ def run_yolo_version(
     print(f"\n[version] {version} - {len(specs)} spec(s) found")
     results: list[SpecResult] = []
 
+    cfg = config or {}
+    image = cfg.get("project", {}).get("docker_image") or _DEFAULTS["project"]["docker_image"]
+    workspace = cfg.get("project", {}).get("workspace") or _DEFAULTS["project"]["workspace"]
+
     for spec in specs:
         branch = _spec_branch_name(version, spec.stem)
         print(f"\n[version] -- spec: {spec.name}  branch: {branch} --")
@@ -340,19 +441,48 @@ def run_yolo_version(
             duration_s = time.monotonic() - t0
             results.append(SpecResult(spec.stem, "FAILED", duration_s, branch))
             continue
-        run_implement(
+
+        container_cmd = build_docker_command(
             project_dir,
             home_dir,
-            spec=spec,
-            review=review,
-            extra_args=extra_args,
-            dry_run=dry_run,
+            extra_args,
             image=image,
             workspace=workspace,
-            config=config,
+            interactive=False,
         )
+
+        if dry_run:
+            print("# container:", " ".join(container_cmd))
+            status = "DONE"
+        else:
+            rc, _last_lines, did_timeout = _run_with_timeout(
+                container_cmd, session_timeout_s, idle_timeout_s
+            )
+            if did_timeout:
+                status = "TIMED_OUT"
+            elif rc == 0:
+                status = "DONE"
+            else:
+                status = "FAILED"
+
+            if review and status != "TIMED_OUT":
+                e2e_cmd = (
+                    cfg.get("validation", {}).get("e2e_tests")
+                    or _DEFAULTS["validation"]["e2e_tests"]
+                )
+                subprocess.run(
+                    _build_e2e_command(project_dir, e2e_cmd, image, workspace),
+                    check=False,
+                )
+                review_script = (
+                    cfg.get("review", {}).get("review_script")
+                    or _DEFAULTS["review"]["review_script"]
+                )
+                rev_cmd = [_PY, review_script, "--spec", spec.as_posix()]
+                subprocess.run(rev_cmd, check=False)
+
         duration_s = time.monotonic() - t0
-        results.append(SpecResult(spec.stem, "DONE", duration_s, branch))
+        results.append(SpecResult(spec.stem, status, duration_s, branch))
 
     _print_version_report(results, version)
 
@@ -434,6 +564,12 @@ def main(argv: list[str] | None = None) -> None:
     workspace = proj["workspace"]
     specs_dir = proj["specs_dir"]
 
+    res = config.get("resilience", _DEFAULTS["resilience"])
+    session_timeout_min, extra = _extract_int_flag(extra, "--session-timeout")
+    idle_timeout_min, extra = _extract_int_flag(extra, "--idle-timeout")
+    session_timeout_s = (session_timeout_min or res["session_timeout_minutes"]) * 60.0
+    idle_timeout_s = (idle_timeout_min or res["idle_timeout_minutes"]) * 60.0
+
     if explore:
         run_explore(extra, dry_run)
         return
@@ -447,8 +583,8 @@ def main(argv: list[str] | None = None) -> None:
             extra,
             dry_run,
             specs_dir=specs_dir,
-            image=image,
-            workspace=workspace,
+            session_timeout_s=session_timeout_s,
+            idle_timeout_s=idle_timeout_s,
             config=config,
         )
         return
