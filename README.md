@@ -29,15 +29,24 @@ Turn any Markdown document into an audio tutorial and MP4 video from a terminal 
 
 ## Quick start
 
+Install from PyPI:
+
+```powershell
+pip install learnx-cli
+```
+
+Or install from the source tree:
+
 ```powershell
 pip install -r requirements.txt
 echo "GROQ_API_KEY=gsk_..." > tutor/.env
+echo "OPENROUTER_API_KEY=sk-or-..." >> tutor/.env
 playwright install chromium
 python -m tutor
 ```
 
 Requires Python 3.12+, [ffmpeg](https://ffmpeg.org/download.html) in PATH.
-Free API key at [console.groq.com](https://console.groq.com).
+Free API keys at [console.groq.com](https://console.groq.com) and [openrouter.ai](https://openrouter.ai).
 
 ```
 LearnX > /generate notes.md    # markdown → dialogue → audio
