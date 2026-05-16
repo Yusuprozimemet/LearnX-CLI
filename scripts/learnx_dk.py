@@ -19,6 +19,7 @@ Examples:
     python scripts/learnx_dk.py --dry-run
 """
 
+import atexit
 import json
 import os
 import pathlib
@@ -584,6 +585,17 @@ def run_yolo_version(
         or _DEFAULTS["resilience"]["rate_limit_patterns"]
     )
 
+    notifier = Notifier(cfg)
+    _notified = [False]
+
+    def _atexit_handler() -> None:
+        if _notified[0] or not notifier.enabled():
+            return
+        payload = _build_notify_payload(version, results, "aborted", start_time, cfg)
+        notifier.send(payload)
+
+    atexit.register(_atexit_handler)
+
     for spec in specs:
         branch = _spec_branch_name(version, spec.stem)
         print(f"\n[version] -- spec: {spec.name}  branch: {branch} --")
@@ -661,10 +673,10 @@ def run_yolo_version(
 
     _print_version_report(results, version)
 
-    notifier = Notifier(cfg)
-    if notifier.enabled() and not dry_run:
+    if notifier.enabled():
         payload = _build_notify_payload(version, results, "completed", start_time, cfg)
         notifier.send(payload)
+        _notified[0] = True
 
 
 # ── CLI ──────────────────────────────────────────────────────────────────────

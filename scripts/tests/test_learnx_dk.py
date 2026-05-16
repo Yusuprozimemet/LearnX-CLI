@@ -651,3 +651,77 @@ def test_main_calls_notifier_after_run_implement(tmp_path):
     mock_send.assert_called_once()
     payload = mock_send.call_args[0][0]
     assert payload["status"] == "completed"
+
+
+# ── Day 27: atexit fallback and notification wiring ───────────────────────────
+
+
+def test_notifier_send_not_called_when_disabled():
+    """When no channels configured, send() is a no-op — no network calls made."""
+    n = Notifier({"notify": {}})
+    assert n.enabled() is False
+    with patch("scripts.learnx_dk.urllib.request.urlopen") as mock_open:
+        n.send({"status": "completed"})
+    mock_open.assert_not_called()
+
+
+def test_run_yolo_version_sends_notification_on_completion(tmp_path, dirs):
+    """After all specs run, notifier fires via urlopen with status='completed'."""
+    project, home = dirs
+    ver_dir = tmp_path / "specs" / "v5"
+    ver_dir.mkdir(parents=True)
+    (ver_dir / "day1.md").write_text("# day1")
+
+    cfg = {
+        **_DEFAULTS,
+        "notify": {"webhook_url": "https://example.com/hook"},
+    }
+
+    with (
+        patch("scripts.learnx_dk.urllib.request.urlopen") as mock_open,
+        patch("scripts.learnx_dk._checkout_spec_branch", return_value=True),
+        patch("scripts.learnx_dk._run_with_timeout", return_value=(0, [], False)),
+    ):
+        run_yolo_version(
+            tmp_path, home, "v5", review=False, extra_args=[], dry_run=False, config=cfg
+        )
+
+    mock_open.assert_called_once()
+    payload = json.loads(mock_open.call_args[0][0].data)
+    assert payload["status"] == "completed"
+    assert payload["version"] == "v5"
+
+
+def test_atexit_handler_sends_aborted_when_not_notified(tmp_path, dirs):
+    """atexit handler fires with status='aborted' when run is interrupted before completion."""
+    project, home = dirs
+    ver_dir = tmp_path / "specs" / "v5"
+    ver_dir.mkdir(parents=True)
+    (ver_dir / "day1.md").write_text("# day1")
+
+    cfg = {
+        **_DEFAULTS,
+        "notify": {"webhook_url": "https://example.com/hook"},
+    }
+
+    captured_handler = []
+
+    with (
+        patch("atexit.register", side_effect=lambda fn: captured_handler.append(fn)),
+        patch(
+            "scripts.learnx_dk._checkout_spec_branch",
+            side_effect=RuntimeError("simulated abort"),
+        ),
+        patch("scripts.learnx_dk.urllib.request.urlopen") as mock_open,
+    ):
+        with pytest.raises(RuntimeError):
+            run_yolo_version(
+                tmp_path, home, "v5", review=False, extra_args=[], dry_run=False, config=cfg
+            )
+
+        # handler was registered before the abort; _notified[0] is still False
+        assert len(captured_handler) == 1
+        captured_handler[0]()
+        mock_open.assert_called_once()
+        payload = json.loads(mock_open.call_args[0][0].data)
+        assert payload["status"] == "aborted"
