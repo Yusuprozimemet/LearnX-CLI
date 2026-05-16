@@ -23,6 +23,7 @@ import json
 import os
 import pathlib
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -140,9 +141,12 @@ def build_docker_command(
 
 def _build_e2e_command(
     project_dir: pathlib.Path,
+    e2e_cmd: str = "python -m pytest tutor/tests/e2e/ -v",
     image: str = IMAGE,
     workspace: str = WORKSPACE,
 ) -> list[str]:
+    """Build docker run command that executes e2e_cmd inside the container."""
+    inner = shlex.split(e2e_cmd)
     return [
         "docker",
         "run",
@@ -152,12 +156,7 @@ def _build_e2e_command(
         "-w",
         workspace,
         image,
-        "python",
-        "-m",
-        "pytest",
-        "tutor/tests/e2e/",
-        "-v",
-    ]
+    ] + inner
 
 
 # kept for backwards-compatibility with tests and run_review.py
@@ -200,7 +199,12 @@ def run_implement(
     dry_run: bool,
     image: str = IMAGE,
     workspace: str = WORKSPACE,
+    config: dict | None = None,
 ) -> None:
+    cfg = config or _DEFAULTS
+    e2e_cmd = cfg["validation"]["e2e_tests"]
+    review_script = cfg["review"]["review_script"]
+
     container_cmd = build_docker_command(
         project_dir, home_dir, extra_args, image=image, workspace=workspace
     )
@@ -209,14 +213,14 @@ def run_implement(
         print("# Step 1 — container session")
         print(" ".join(container_cmd))
         if review:
-            e2e_cmd = _build_e2e_command(project_dir, image=image, workspace=workspace)
-            review_cmd = [_PY, "scripts/run_review.py"]
+            e2e_docker_cmd = _build_e2e_command(project_dir, e2e_cmd, image, workspace)
+            rev_cmd = [_PY, review_script]
             if spec:
-                review_cmd += ["--spec", spec.as_posix()]
+                rev_cmd += ["--spec", spec.as_posix()]
             print("# Step 2 — E2E smoke tests (inside container)")
-            print(" ".join(e2e_cmd))
+            print(" ".join(e2e_docker_cmd))
             print("# Step 3 — review pipeline")
-            print(" ".join(review_cmd))
+            print(" ".join(rev_cmd))
         return
 
     print("\n[implement] starting container session...")
@@ -225,14 +229,14 @@ def run_implement(
     if review:
         print("\n[implement] running E2E smoke tests...")
         e2e_result = subprocess.run(
-            _build_e2e_command(project_dir, image=image, workspace=workspace), check=False
+            _build_e2e_command(project_dir, e2e_cmd, image, workspace), check=False
         )
 
-        review_cmd = [_PY, "scripts/run_review.py"]
+        rev_cmd = [_PY, review_script]
         if spec:
-            review_cmd += ["--spec", spec.as_posix()]
+            rev_cmd += ["--spec", spec.as_posix()]
         print("\n[implement] running review pipeline...")
-        subprocess.run(review_cmd, check=False)
+        subprocess.run(rev_cmd, check=False)
 
         if e2e_result.returncode != 0:
             print("\n[implement] WARNING: E2E tests had failures — review findings carefully")
@@ -311,6 +315,7 @@ def run_yolo_version(
     specs_dir: str = "specs",
     image: str = IMAGE,
     workspace: str = WORKSPACE,
+    config: dict | None = None,
 ) -> None:
     specs = _discover_specs(project_dir / specs_dir, version)
     if not specs:
@@ -338,6 +343,7 @@ def run_yolo_version(
             dry_run=dry_run,
             image=image,
             workspace=workspace,
+            config=config,
         )
         duration_s = time.monotonic() - t0
         results.append(SpecResult(spec.stem, "DONE", duration_s, branch))
@@ -437,11 +443,20 @@ def main(argv: list[str] | None = None) -> None:
             specs_dir=specs_dir,
             image=image,
             workspace=workspace,
+            config=config,
         )
         return
 
     run_implement(
-        project_dir, home_dir, spec, review, extra, dry_run, image=image, workspace=workspace
+        project_dir,
+        home_dir,
+        spec,
+        review,
+        extra,
+        dry_run,
+        image=image,
+        workspace=workspace,
+        config=config,
     )
 
 

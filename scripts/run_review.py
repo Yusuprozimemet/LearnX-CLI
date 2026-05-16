@@ -21,7 +21,7 @@ _ROOT = pathlib.Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from scripts.learnx_dk import build_command  # noqa: E402, I001
+from scripts.learnx_dk import _load_config, build_command  # noqa: E402, I001
 
 
 REVIEW_PROMPT_TEMPLATE = """
@@ -29,6 +29,7 @@ You are running a pre-merge code review for the LearnX project.
 
 Branch diff: run `git diff main...HEAD` to see all changes on this branch.
 {spec_instruction}
+{agents_instruction}
 
 Launch the following four review agents IN PARALLEL using the Task tool:
 1. quality        — bugs, security, logic errors
@@ -69,13 +70,19 @@ def build_review_command(
     home_dir: pathlib.Path,
     spec_path: pathlib.Path | None,
     extra_args: list[str],
+    agents_dir: str = ".claude/agents",
 ) -> list[str]:
     if spec_path:
         spec_instruction = f"Spec file: {spec_path} (pass to implementation agent)"
     else:
         spec_instruction = "No spec file provided — implementation agent checks consistency only."
 
-    prompt = REVIEW_PROMPT_TEMPLATE.format(spec_instruction=spec_instruction).strip()
+    agents_instruction = f"Review agents are in {agents_dir}/."
+
+    prompt = REVIEW_PROMPT_TEMPLATE.format(
+        spec_instruction=spec_instruction,
+        agents_instruction=agents_instruction,
+    ).strip()
 
     cmd = build_command(project_dir, home_dir, extra_args=[])
 
@@ -103,10 +110,20 @@ def main(argv: list[str] | None = None) -> None:
         spec_path = pathlib.Path(remaining[idx + 1])
         remaining = remaining[:idx] + remaining[idx + 2 :]
 
+    agents_dir: str | None = None
+    if "--agents-dir" in remaining:
+        idx = remaining.index("--agents-dir")
+        agents_dir = remaining[idx + 1]
+        remaining = remaining[:idx] + remaining[idx + 2 :]
+
     project_dir = pathlib.Path.cwd()
     home_dir = pathlib.Path.home()
 
-    cmd = build_review_command(project_dir, home_dir, spec_path, remaining)
+    if agents_dir is None:
+        config = _load_config(project_dir)
+        agents_dir = config["review"]["agents_dir"]
+
+    cmd = build_review_command(project_dir, home_dir, spec_path, remaining, agents_dir=agents_dir)
 
     if dry_run:
         print(" ".join(cmd))

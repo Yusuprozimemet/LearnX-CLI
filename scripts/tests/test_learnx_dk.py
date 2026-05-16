@@ -6,6 +6,7 @@ import pytest
 from scripts.learnx_dk import (
     EXPLORE_PERMISSIONS,
     SpecResult,
+    _build_e2e_command,
     _checkout_spec_branch,
     _discover_specs,
     _load_config,
@@ -111,6 +112,26 @@ def test_load_config_merges_missing_keys_with_defaults(tmp_path):
     (tmp_path / "devloop.toml").write_text('[project]\ndocker_image = "custom-image"\n')
     config = _load_config(tmp_path)
     assert config["project"]["workspace"] == "/workspace"
+
+
+def test_build_e2e_command_uses_config_cmd(dirs):
+    project, home = dirs
+    cmd = _build_e2e_command(project, e2e_cmd="go test ./...", image="go-dev", workspace="/app")
+    assert "go" in cmd
+    assert "test" in cmd
+    assert "./..." in cmd
+    assert "go-dev" in cmd
+
+
+def test_run_implement_review_dry_run_uses_config_review_script(dirs, capsys):
+    project, home = dirs
+    config = {
+        "validation": {"e2e_tests": "python -m pytest tutor/tests/e2e/ -v"},
+        "review": {"review_script": "scripts/custom_review.py"},
+    }
+    run_implement(project, home, spec=None, review=True, extra_args=[], dry_run=True, config=config)
+    out = capsys.readouterr().out
+    assert "custom_review.py" in out
 
 
 def test_build_docker_command_uses_custom_image(dirs):
