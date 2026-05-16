@@ -2,6 +2,9 @@
 
 ![CI](https://github.com/Yusuprozimemet/LearnX-CLI/actions/workflows/ci.yml/badge.svg)
 [![PyPI](https://img.shields.io/pypi/v/learnx-cli.svg)](https://pypi.org/project/learnx-cli/)
+[![License](https://img.shields.io/pypi/l/learnx-cli.svg)](https://pypi.org/project/learnx-cli/)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
+[![DevLoop](https://img.shields.io/badge/DevLoop-agentic%20spec--driven-111827)](DEVLOOP.md)
 
 Turn any Markdown document into an audio tutorial and MP4 video from a terminal shell.
 
@@ -179,14 +182,14 @@ python -m ruff check tutor/
 
 Docker is the default. Always.
 
-| Command | Effect |
-|---|---|
-| `python scripts/devloop.py --spec X` | Docker — implement spec X, no review |
-| `python scripts/devloop.py --spec X --review` | Docker — implement X, then E2E + two-phase review |
+| Command                                           | Effect                                                |
+| ------------------------------------------------- | ----------------------------------------------------- |
+| `python scripts/devloop.py --spec X`              | Docker — implement spec X, no review                  |
+| `python scripts/devloop.py --spec X --review`     | Docker — implement X, then E2E + two-phase review     |
 | `python scripts/devloop.py --version vN --review` | Docker — run all specs in vN sequentially with review |
-| `python scripts/devloop.py --version vN --serve` | Same, with live dashboard at localhost:8080 |
-| `python scripts/devloop.py --explore` | Host only — read-only, no code changes |
-| `python scripts/devloop.py --dry-run` | Print commands without executing |
+| `python scripts/devloop.py --version vN --serve`  | Same, with live dashboard at localhost:8080           |
+| `python scripts/devloop.py --explore`             | Host only — read-only, no code changes                |
+| `python scripts/devloop.py --dry-run`             | Print commands without executing                      |
 
 **`--version`** runs every spec in `specs/vN/` in day-number order. Each spec gets
 its own sandbox branch (`sandbox/vN-dayN`). Rate-limit retries and session/idle
@@ -209,8 +212,8 @@ accidental edits.
 
 Change model inside any Claude session with `/model`:
 
-| Model | Speed | Best for |
-|-------|-------|----------|
-| `claude-sonnet-4-6` | fast | default — most tasks |
-| `claude-opus-4-7` | slower, smarter | complex reasoning, hard bugs |
-| `claude-haiku-4-5` | fastest | simple tasks, quick lookups |
+| Model               | Speed           | Best for                     |
+| ------------------- | --------------- | ---------------------------- |
+| `claude-sonnet-4-6` | fast            | default — most tasks         |
+| `claude-opus-4-7`   | slower, smarter | complex reasoning, hard bugs |
+| `claude-haiku-4-5`  | fastest         | simple tasks, quick lookups  |
