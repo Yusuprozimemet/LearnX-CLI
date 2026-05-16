@@ -41,6 +41,9 @@ _DEFAULTS: dict = {
         "telegram_chat_id_env": None,
         "script": None,
     },
+    "dashboard": {
+        "default_port": 8080,
+    },
 }
 
 

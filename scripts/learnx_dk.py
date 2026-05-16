@@ -24,6 +24,7 @@ import sys
 
 # Re-exported for backward compatibility (run_review.py, tests)
 from scripts.dk.config import _DEFAULTS, SpecResult, _load_config  # noqa: F401
+from scripts.dk.dashboard import DASHBOARD_HTML, DashboardServer, OutputBuffer  # noqa: F401
 from scripts.dk.docker import (  # noqa: F401
     EXPLORE_PERMISSIONS,
     IMAGE,
