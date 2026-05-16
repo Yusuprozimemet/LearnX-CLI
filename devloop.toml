@@ -30,6 +30,9 @@ rate_limit_patterns = [
     "quota exceeded",
 ]
 
+[dashboard]
+default_port = 8080
+
 # [notify]
 # Credentials are NEVER stored here — list the env var name, not the value.
 #
