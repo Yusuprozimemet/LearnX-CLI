@@ -142,8 +142,16 @@ def main(argv: list[str] | None = None) -> None:
     extra = [a for a in extra if a != "--serve"]
     port_override, extra = _extract_int_flag(extra, "--port")
     dash_cfg = config.get("dashboard", _DEFAULTS["dashboard"])
-    env_port = int(os.environ.get("LEARNX_DASHBOARD_PORT", 0))
-    port = port_override or env_port or dash_cfg["default_port"]
+    _raw_env = os.environ.get("LEARNX_DASHBOARD_PORT", "")
+    try:
+        env_port: int | None = int(_raw_env) if _raw_env else None
+    except ValueError:
+        env_port = None
+    port = (
+        port_override
+        if port_override is not None
+        else (env_port if env_port is not None else dash_cfg["default_port"])
+    )
 
     if serve and not version:
         print("[dashboard] --serve is only used with --version; ignoring", flush=True)

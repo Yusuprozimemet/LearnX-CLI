@@ -136,12 +136,12 @@ def test_serve_flag_consumed_from_extra(dirs, capsys):
         patch("scripts.learnx_dk.run_implement") as mock_impl,
     ):
         main(["--serve", "--dry-run"])
-    if mock_impl.called:
-        call_extra = mock_impl.call_args.kwargs.get(
-            "extra_args",
-            mock_impl.call_args.args[4] if len(mock_impl.call_args.args) > 4 else [],
-        )
-        assert "--serve" not in call_extra
+    mock_impl.assert_called_once()
+    call_extra = mock_impl.call_args.kwargs.get(
+        "extra_args",
+        mock_impl.call_args.args[4] if len(mock_impl.call_args.args) > 4 else [],
+    )
+    assert "--serve" not in call_extra
 
 
 def test_port_flag_consumed_from_extra(dirs, capsys):
@@ -154,13 +154,13 @@ def test_port_flag_consumed_from_extra(dirs, capsys):
         patch("scripts.learnx_dk.run_implement") as mock_impl,
     ):
         main(["--port", "9090", "--dry-run"])
-    if mock_impl.called:
-        call_extra = mock_impl.call_args.kwargs.get(
-            "extra_args",
-            mock_impl.call_args.args[4] if len(mock_impl.call_args.args) > 4 else [],
-        )
-        assert "--port" not in call_extra
-        assert "9090" not in call_extra
+    mock_impl.assert_called_once()
+    call_extra = mock_impl.call_args.kwargs.get(
+        "extra_args",
+        mock_impl.call_args.args[4] if len(mock_impl.call_args.args) > 4 else [],
+    )
+    assert "--port" not in call_extra
+    assert "9090" not in call_extra
 
 
 def test_run_with_timeout_tees_to_output_buffer():
