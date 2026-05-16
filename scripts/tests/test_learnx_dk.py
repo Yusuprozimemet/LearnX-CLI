@@ -11,6 +11,7 @@ from scripts.learnx_dk import (
     _checkout_spec_branch,
     _discover_specs,
     _extract_int_flag,
+    _is_rate_limited,
     _load_config,
     _parse,
     _print_version_report,
@@ -453,3 +454,26 @@ def test_run_with_timeout_kills_on_session_timeout():
     rc, lines, timed_out = _run_with_timeout(cmd, session_timeout_s=2.0, idle_timeout_s=0)
     assert timed_out is True
     assert rc != 0
+
+
+# ── Day 25 (v8) tests ────────────────────────────────────────────────────────
+
+
+def test_is_rate_limited_matches_pattern():
+    lines = ["some output", "Error: rate limit exceeded", "bye"]
+    assert _is_rate_limited(lines, ["rate limit exceeded"]) is True
+
+
+def test_is_rate_limited_case_insensitive():
+    lines = ["You've Hit Your Limit for today"]
+    assert _is_rate_limited(lines, ["you've hit your limit"]) is True
+
+
+def test_is_rate_limited_no_match():
+    lines = ["all good", "tests passed", "done"]
+    assert _is_rate_limited(lines, ["rate limit exceeded"]) is False
+
+
+def test_spec_result_retries_defaults_to_zero():
+    r = SpecResult("day1", "DONE", 60.0, "sandbox/v5-day1")
+    assert r.retries == 0
