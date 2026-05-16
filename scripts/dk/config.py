@@ -21,6 +21,7 @@ _DEFAULTS: dict = {
     "review": {
         "agents_dir": ".claude/agents",
         "review_script": "scripts/run_review.py",
+        "two_phase": True,
     },
     "resilience": {
         "session_timeout_minutes": 30,

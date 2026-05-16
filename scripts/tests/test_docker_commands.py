@@ -1,10 +1,10 @@
 """Tests for Docker command building and config loading (Day 2, Day 22)."""
 
-import pytest
 from unittest.mock import patch
 
+import pytest
+
 from scripts.learnx_dk import (
-    _DEFAULTS,
     _build_e2e_command,
     _load_config,
     build_command,
@@ -12,7 +12,6 @@ from scripts.learnx_dk import (
     run_implement,
     run_yolo_version,
 )
-
 
 # ── Day 2 — Docker command building ──────────────────────────────────────────
 

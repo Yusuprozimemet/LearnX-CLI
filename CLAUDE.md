@@ -182,6 +182,8 @@ CLEAN CODE
   No functions longer than 40 lines. No nesting deeper than 3 levels.
   No magic numbers — use named constants.
   No dead code, no commented-out blocks, no TODO left in committed code.
+  Never hardcode a parameter value inside a function body when the caller
+    passed that value as an argument — always forward the parameter.
 
 MAINTAINABILITY
   Every module has a single clear responsibility (SRP).
