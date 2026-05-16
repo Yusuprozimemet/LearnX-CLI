@@ -609,9 +609,13 @@ def main(argv: list[str] | None = None) -> None:
     session_timeout_min, extra = _extract_int_flag(extra, "--session-timeout")
     idle_timeout_min, extra = _extract_int_flag(extra, "--idle-timeout")
     wait_min, extra = _extract_int_flag(extra, "--wait")
-    session_timeout_s = (session_timeout_min or res["session_timeout_minutes"]) * 60.0
-    idle_timeout_s = (idle_timeout_min or res["idle_timeout_minutes"]) * 60.0
-    rate_limit_wait_s = (wait_min or res["rate_limit_wait_minutes"]) * 60.0
+    session_timeout_s = (
+        res["session_timeout_minutes"] if session_timeout_min is None else session_timeout_min
+    ) * 60.0
+    idle_timeout_s = (
+        res["idle_timeout_minutes"] if idle_timeout_min is None else idle_timeout_min
+    ) * 60.0
+    rate_limit_wait_s = (res["rate_limit_wait_minutes"] if wait_min is None else wait_min) * 60.0
 
     if explore:
         run_explore(extra, dry_run)

@@ -477,3 +477,16 @@ def test_is_rate_limited_no_match():
 def test_spec_result_retries_defaults_to_zero():
     r = SpecResult("day1", "DONE", 60.0, "sandbox/v5-day1")
     assert r.retries == 0
+
+
+def test_wait_zero_overrides_config_default(dirs):
+    """--wait 0 must pass rate_limit_wait_s=0.0, not fall back to config default."""
+    project, home = dirs
+    with (
+        patch("scripts.learnx_dk.pathlib.Path.cwd", return_value=project),
+        patch("scripts.learnx_dk.pathlib.Path.home", return_value=home),
+        patch("scripts.learnx_dk.run_yolo_version") as mock_yolo,
+    ):
+        main(["--version", "v5", "--wait", "0"])
+    call_kwargs = mock_yolo.call_args.kwargs
+    assert call_kwargs.get("rate_limit_wait_s") == 0.0
