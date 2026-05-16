@@ -168,6 +168,40 @@ v4 workflow upgrade — all completed and merged to main. See `dev_setup_update/
 
 ---
 
+## Code Quality Rules
+
+These rules apply to every file touched during a spec day or refactoring session.
+
+```
+MAX 400 LOC PER FILE — if a file exceeds 400 lines, split it before committing.
+  Extract by cohesion: group things that change together and depend on each other.
+  Keep the public interface in the original file; move implementation to submodules.
+
+CLEAN CODE
+  Functions do one thing. Name them for what they do, not how.
+  No functions longer than 40 lines. No nesting deeper than 3 levels.
+  No magic numbers — use named constants.
+  No dead code, no commented-out blocks, no TODO left in committed code.
+
+MAINTAINABILITY
+  Every module has a single clear responsibility (SRP).
+  Avoid deep coupling: pass what a function needs, don't let it reach into globals.
+  Prefer explicit imports over star imports.
+  Update imports everywhere when you move code.
+
+SCALABILITY
+  New behaviour should be addable without modifying existing logic (OCP).
+  Favour composition over inheritance for extending behaviour.
+  Config goes in devloop.toml / llm_config.toml, not hardcoded in source.
+
+REUSABILITY
+  Pure functions (no side effects) are easier to test and reuse — prefer them.
+  Separate I/O (file reads, subprocess calls, network) from logic.
+  If two files share a helper, extract it to a shared module; never duplicate.
+```
+
+---
+
 ## Hard Rules
 
 ```
@@ -178,6 +212,7 @@ NEVER skip the merge gate (full pytest + ruff)
 NEVER merge — human merges after review
 NEVER start Day N+1 until Day N is merged to main
 NEVER skip writing a fixes file after finding and fixing a non-obvious bug
+NEVER let a file exceed 400 LOC — split first, then commit
 ```
 
 ---
