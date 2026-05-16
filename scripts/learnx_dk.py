@@ -376,6 +376,12 @@ def _parse(argv: list[str]) -> tuple[str, bool, pathlib.Path | None, str | None,
 def main(argv: list[str] | None = None) -> None:
     if argv is None:
         argv = sys.argv[1:]
+    # Ensure Unicode output works on Windows terminals (cp1252 → utf-8)
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
 
     mode, dry_run, spec, version, extra = _parse(argv)
     project_dir = pathlib.Path.cwd()
