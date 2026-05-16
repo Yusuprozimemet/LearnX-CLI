@@ -1,13 +1,17 @@
 {% extends "_base.html.j2" %}
+{% block extra_style %}:root { --type-accent: var(--cyan); }{% endblock %}
 {% block content %}
 <div class="hook-slide">
-  <h1 class="hook-question">{{ seg.title | e }}</h1>
+  <div class="hook-question">{{ seg.title | e }}</div>
   {% if seg.body %}
-  <ul class="learn-list">
-    {% for item in seg.body.split('\n') if item.strip() %}
-    <li>{{ item | e }}</li>
-    {% endfor %}
-  </ul>
+  <div>
+    <div class="learn-label">What you'll learn</div>
+    <ul class="learn-list">
+      {% for item in seg.body.split('\n') if item.strip() %}
+      <li>{{ item.strip() | e }}</li>
+      {% endfor %}
+    </ul>
+  </div>
   {% endif %}
 </div>
 {% endblock %}

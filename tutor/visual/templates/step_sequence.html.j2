@@ -1,0 +1,14 @@
+{% extends "_base.html.j2" %}
+{% block extra_style %}:root { --type-accent: var(--sky); }{% endblock %}
+{% block content %}
+<div class="step-slide">
+  {% if seg.body %}
+    {% for step in seg.body.split('\n') if step.strip() %}
+    <div class="step-item">
+      <div class="step-num">{{ loop.index }}</div>
+      <div class="step-text">{{ step.strip() | e }}</div>
+    </div>
+    {% endfor %}
+  {% endif %}
+</div>
+{% endblock %}

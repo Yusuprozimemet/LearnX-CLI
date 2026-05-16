@@ -1,21 +1,16 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=1920, height=1080">
-<link rel="stylesheet" href="{{ asset_dir }}/slide_base.css">
-<link rel="stylesheet" href="{{ asset_dir }}/theme-learnx-dark.css">
-</head>
-<body>
-<div class="top-bar">LearnX</div>
-<div class="content">
-  <div class="outro-slide">
-    <p class="outro-text">{{ spec.title | e if spec is defined and spec.title is defined else 'Thanks for watching!' }}</p>
-    {% if spec is defined and spec.subtitle is defined and spec.subtitle %}
-    <p class="outro-sub">{{ spec.subtitle | e }}</p>
-    {% endif %}
+{% extends "_base.html.j2" %}
+{% block top_bar %}LearnX{% endblock %}
+{% block footer %}{% endblock %}
+{% block content %}
+<div class="outro-slide">
+  <div class="outro-text">That's a wrap.</div>
+  {% if spec is defined and spec.memory_hooks %}
+  <div class="outro-sub">
+    {% for hook in spec.memory_hooks[:3] %}{{ hook | e }}{% if not loop.last %} &nbsp;·&nbsp; {% endif %}{% endfor %}
   </div>
+  {% endif %}
+  {% if spec is defined and spec.session_stats %}
+  <div class="outro-sub">{{ spec.session_stats | e }}</div>
+  {% endif %}
 </div>
-<div class="footer-bar"></div>
-</body>
-</html>
+{% endblock %}

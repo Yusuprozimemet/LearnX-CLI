@@ -1,14 +1,21 @@
 {% extends "_base.html.j2" %}
+{% block extra_style %}:root { --type-accent: var(--purple); }{% endblock %}
 {% block content %}
 <div class="analogy-slide">
+  {% if seg.rows %}
   <div class="analogy-panel">
-    <div class="analogy-label">{{ seg.left | default('') | e }}</div>
-    <div class="analogy-body">{{ (seg.rows[0][0] if seg.rows else '') | e }}</div>
+    <div class="analogy-label">{{ seg.left | default('Real world') | e }}</div>
+    <div class="analogy-body">{{ seg.rows[0][0] | e }}</div>
   </div>
   <div class="analogy-sep">&#8776;</div>
   <div class="analogy-panel">
-    <div class="analogy-label">{{ seg.right | default('') | e }}</div>
-    <div class="analogy-body">{{ (seg.rows[0][1] if seg.rows else '') | e }}</div>
+    <div class="analogy-label">{{ seg.right | default('In code') | e }}</div>
+    <div class="analogy-body">{{ seg.rows[0][1] | e }}</div>
   </div>
+  {% else %}
+  <div class="analogy-panel" style="grid-column:1/4;">
+    <div class="analogy-body">{{ seg.body | e if seg.body else seg.title | e }}</div>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

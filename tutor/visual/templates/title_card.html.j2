@@ -1,21 +1,12 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=1920, height=1080">
-<link rel="stylesheet" href="{{ asset_dir }}/slide_base.css">
-<link rel="stylesheet" href="{{ asset_dir }}/theme-learnx-dark.css">
-</head>
-<body>
-<div class="top-bar">LearnX</div>
-<div class="content">
-  <div class="title-card-slide">
-    <h1 class="title-card-title">{{ spec.title | e if spec is defined and spec.title is defined else 'LearnX Tutorial' }}</h1>
-    {% if spec is defined and spec.subtitle is defined and spec.subtitle %}
-    <p class="title-card-sub">{{ spec.subtitle | e }}</p>
-    {% endif %}
-  </div>
+{% extends "_base.html.j2" %}
+{% block top_bar %}LearnX{% endblock %}
+{% block footer %}{% endblock %}
+{% block content %}
+<div class="title-card-slide">
+  <div class="title-card-accent"></div>
+  <div class="title-card-title">{{ spec.title | e if spec is defined and spec.title else 'LearnX Tutorial' }}</div>
+  {% if spec is defined and spec.subtitle %}
+  <div class="title-card-sub">{{ spec.subtitle | e }}</div>
+  {% endif %}
 </div>
-<div class="footer-bar"></div>
-</body>
-</html>
+{% endblock %}

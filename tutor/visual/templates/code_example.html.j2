@@ -1,11 +1,12 @@
 {% extends "_base.html.j2" %}
+{% block extra_style %}:root { --type-accent: var(--green); }{% endblock %}
 {% block content %}
 <div class="code-slide">
   {% if seg.body %}
-  <p class="code-desc">{{ seg.body | e }}</p>
+  <div class="code-desc">{{ seg.body | e }}</div>
   {% endif %}
   {% if seg.code %}
-  <pre><code class="language-{{ seg.language or 'java' }}">{{ seg.code | e }}</code></pre>
+  <pre><code class="language-{{ seg.language or 'text' }}">{{ seg.code | e }}</code></pre>
   {% endif %}
 </div>
 {% endblock %}

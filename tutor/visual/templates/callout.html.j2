@@ -1,0 +1,10 @@
+{% extends "_base.html.j2" %}
+{% block extra_style %}:root { --type-accent: var(--amber); }{% endblock %}
+{% block content %}
+<div class="callout-slide">
+  <div class="callout-box">
+    <div class="callout-label">{{ seg.title | e }}</div>
+    <div class="callout-text">{{ seg.body | e }}</div>
+  </div>
+</div>
+{% endblock %}
