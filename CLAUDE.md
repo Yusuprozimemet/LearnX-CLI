@@ -156,7 +156,7 @@ v4 workflow upgrade — all completed and merged to main. See `dev_setup_update/
 | 0  | `dev_setup_update/specs/day0.md`  | Repository cleanup | Merged |
 | 1  | `dev_setup_update/specs/day1.md`  | Docker image | Merged |
 | 2  | `dev_setup_update/specs/day2.md`  | Container wrapper + settings | Merged |
-| 2b | `dev_setup_update/specs/day2b.md` | Launcher modes (supervised/assisted/container/yolo) | Merged |
+| 2b | `dev_setup_update/specs/day2b.md` | Launcher modes (retired in v6) | Merged |
 | 3  | `dev_setup_update/specs/day3.md`  | Review pipeline + product check | Merged |
 | 4  | `dev_setup_update/specs/day4.md`  | Dev_setup documentation | Merged |
 | 5  | `dev_setup_update/specs/day5.md`  | E2E smoke tests | Merged |
@@ -185,8 +185,18 @@ NEVER start Day N+1 until Day N is merged to main
 git checkout main
 git checkout -b sandbox/day<N>
 
-# ── Run agent inside container (v4 workflow — no permission prompts) ──
-python scripts/learnx_dk.py
+# ── Run a spec day ───────────────────────────────────────────
+# Implement one spec (Docker, no review):
+python scripts/learnx_dk.py --spec specs/v5/dayN.md
+
+# Implement one spec and run review:
+python scripts/learnx_dk.py --spec specs/v5/dayN.md --review
+
+# Run all specs in a version with review:
+python scripts/learnx_dk.py --version v5 --review
+
+# Explore / ask questions (host, read-only, no Docker):
+python scripts/learnx_dk.py --explore
 
 # ── Scoped test run (fast feedback) ──────────────────────────
 # Inside container:      python -m pytest tutor/tests/<folder>/ -v

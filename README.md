@@ -115,7 +115,7 @@ Replace `dayN` with the actual day number (e.g. `day18`).
 ### Step 4 — Dry run
 
 ```powershell
-python scripts/learnx_dk.py --mode yolo --spec specs/v4/dayN.md --dry-run
+python scripts/learnx_dk.py --spec specs/v5/dayN.md --review --dry-run
 ```
 
 Prints the 3 commands that will run without executing anything. Check it looks right.
@@ -123,7 +123,7 @@ Prints the 3 commands that will run without executing anything. Check it looks r
 ### Step 5 — Launch
 
 ```powershell
-python scripts/learnx_dk.py --mode yolo --spec specs/v4/dayN.md
+python scripts/learnx_dk.py --spec specs/v5/dayN.md --review
 ```
 
 Claude Code opens inside the container. When you see the `>` prompt, paste:
@@ -166,23 +166,23 @@ python -m ruff check tutor/
 
 ---
 
-## The 4 modes
+## Launcher modes
 
-| Mode | Where Claude runs | Prompts | Use when |
-|------|-------------------|---------|----------|
-| `supervised` | host | frequent | exploring, short tasks — **current mode when you open Claude Code directly** |
-| `assisted` | host | rare | trusted scope, fewer interruptions |
-| `container` | Docker | zero | full spec day, no interruptions |
-| `yolo` | Docker + auto review | zero | walk away, come back to a full report |
+Docker is the default. Always.
 
-```powershell
-python scripts/learnx_dk.py                              # supervised (default)
-python scripts/learnx_dk.py --mode assisted
-python scripts/learnx_dk.py --mode container
-python scripts/learnx_dk.py --mode yolo --spec specs/v4/dayN.md
-```
+| Command | Effect |
+|---|---|
+| `python scripts/learnx_dk.py` | Docker container — implement, no review |
+| `python scripts/learnx_dk.py --spec X` | Docker — implement spec X, no review |
+| `python scripts/learnx_dk.py --spec X --review` | Docker — implement X, then E2E + review |
+| `python scripts/learnx_dk.py --version v5 --review` | Docker — run all v5 specs with review |
+| `python scripts/learnx_dk.py --explore` | Host only — questions, no code changes |
 
-> Always use forward slashes in `--spec`: `specs/v4/dayN.md` not `specs\v4\dayN.md`.
+`--explore` starts Claude on the host with read-only permissions (Read, Grep, Glob,
+git read commands). Use it to ask questions about the codebase without risking
+accidental edits.
+
+> Always use forward slashes in `--spec`: `specs/v5/day1.md` not `specs\v5\day1.md`.
 > Backslashes corrupt the path (`\v` is a vertical-tab character).
 
 ---
