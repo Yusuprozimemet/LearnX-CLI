@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
+from scripts.learnx_dk import _DEFAULTS
 from scripts.run_review import (
     PHASE_1_FIX_ADDENDUM,
     PHASE_2_PROMPT_TEMPLATE,
@@ -104,6 +105,7 @@ def test_review_dry_run_does_not_call_subprocess(dirs, capsys):
     with (
         patch("scripts.run_review.pathlib.Path.cwd", return_value=dirs[0]),
         patch("scripts.run_review.pathlib.Path.home", return_value=dirs[1]),
+        patch("scripts.run_review._load_config", return_value=_DEFAULTS),
         patch("scripts.run_review.subprocess.run") as mock_run,
     ):
         main(["--dry-run"])
@@ -192,3 +194,70 @@ def test_phase2_prompt_template_has_phase1_report_placeholder():
     assert "{agents_instruction}" in PHASE_2_PROMPT_TEMPLATE
     assert "verify_fixes" in PHASE_2_PROMPT_TEMPLATE
     assert "regression_check" in PHASE_2_PROMPT_TEMPLATE
+
+
+# ── Day 29 — two-phase orchestration in main() ───────────────────────────────
+
+
+def test_main_dry_run_shows_phase2_note(dirs, capsys):
+    with (
+        patch("scripts.run_review.pathlib.Path.cwd", return_value=dirs[0]),
+        patch("scripts.run_review.pathlib.Path.home", return_value=dirs[1]),
+        patch("scripts.run_review._load_config", return_value=_DEFAULTS),
+    ):
+        main(["--dry-run"])
+    out = capsys.readouterr().out
+    assert "phase 2" in out.lower()
+
+
+def test_main_no_two_phase_flag_skips_phase2(dirs, capsys):
+    """--no-two-phase disables phase 2 regardless of config."""
+    with (
+        patch("scripts.run_review.pathlib.Path.cwd", return_value=dirs[0]),
+        patch("scripts.run_review.pathlib.Path.home", return_value=dirs[1]),
+        patch("scripts.run_review._load_config", return_value=_DEFAULTS),
+        patch(
+            "scripts.run_review.run_phase1", return_value=(0, "NEEDS FIXES\nsome output", True)
+        ) as p1,
+        patch("scripts.run_review.run_phase2") as p2,
+    ):
+        main(["--no-two-phase"])
+    p1.assert_called_once()
+    p2.assert_not_called()
+
+
+def test_main_skips_phase2_when_phase1_clean(dirs, capsys):
+    """Phase 2 is not called when phase 1 output contains MERGE READY."""
+    with (
+        patch("scripts.run_review.pathlib.Path.cwd", return_value=dirs[0]),
+        patch("scripts.run_review.pathlib.Path.home", return_value=dirs[1]),
+        patch("scripts.run_review._load_config", return_value=_DEFAULTS),
+        patch(
+            "scripts.run_review.run_phase1",
+            return_value=(0, "MERGE READY — no blocking issues", False),
+        ) as p1,
+        patch("scripts.run_review.run_phase2") as p2,
+    ):
+        main([])
+    p1.assert_called_once()
+    p2.assert_not_called()
+    out = capsys.readouterr().out
+    assert "skipping phase 2" in out
+
+
+def test_main_calls_phase2_when_phase1_has_findings(dirs):
+    """Phase 2 is called when phase 1 output contains NEEDS FIXES."""
+    with (
+        patch("scripts.run_review.pathlib.Path.cwd", return_value=dirs[0]),
+        patch("scripts.run_review.pathlib.Path.home", return_value=dirs[1]),
+        patch("scripts.run_review._load_config", return_value=_DEFAULTS),
+        patch(
+            "scripts.run_review.run_phase1", return_value=(0, "NEEDS FIXES\nmissing test", True)
+        ) as p1,
+        patch("scripts.run_review.run_phase2", return_value=(0, "VERIFIED")) as p2,
+    ):
+        main([])
+    p1.assert_called_once()
+    p2.assert_called_once()
+    call_kwargs = p2.call_args
+    assert "NEEDS FIXES" in call_kwargs.args[2]
