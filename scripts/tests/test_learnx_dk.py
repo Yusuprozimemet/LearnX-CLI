@@ -194,6 +194,18 @@ def test_version_and_spec_mutually_exclusive():
     assert exc.value.code == 1
 
 
+def test_explore_and_review_mutually_exclusive():
+    with pytest.raises(SystemExit) as exc:
+        _parse(["--explore", "--review"])
+    assert exc.value.code == 1
+
+
+def test_explore_and_version_mutually_exclusive():
+    with pytest.raises(SystemExit) as exc:
+        _parse(["--explore", "--version", "v5"])
+    assert exc.value.code == 1
+
+
 def test_discover_specs_numeric_sort(tmp_path):
     ver_dir = tmp_path / "specs" / "v5"
     ver_dir.mkdir(parents=True)

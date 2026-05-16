@@ -335,6 +335,14 @@ def _parse(
         print("error: --version and --spec are mutually exclusive")
         sys.exit(1)
 
+    if explore and review:
+        print("error: --explore and --review are mutually exclusive")
+        sys.exit(1)
+
+    if explore and version is not None:
+        print("error: --explore and --version are mutually exclusive")
+        sys.exit(1)
+
     return explore, review, dry_run, spec, version, rest
 
 
