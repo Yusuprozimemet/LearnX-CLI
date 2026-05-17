@@ -7,13 +7,9 @@
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
 [![DevLoop](https://img.shields.io/badge/DevLoop-agentic%20spec--driven-111827)](DEVLOOP.md)
 
-<p align="center">
-  <video controls width="720">
-    <source src="https://raw.githubusercontent.com/Yusuprozimemet/LearnX-CLI/main/demo/17.05.2026_13.25.26_REC.mp4" type="video/mp4" />
-  </video>
-  <br/>
-  <em>Local demo recording (MP4)</em>
-</p>
+## Demo
+
+https://github.com/user-attachments/assets/45903bfc-6362-459c-b281-9f2fd86b9676
 
 Turn any Markdown document into an audio tutorial and MP4 video from a terminal shell.
 
