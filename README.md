@@ -13,13 +13,8 @@ https://github.com/user-attachments/assets/45903bfc-6362-459c-b281-9f2fd86b9676
 
 Turn any Markdown document into an audio tutorial and MP4 video from a terminal shell.
 
-<p align="center">
-  <a href="https://youtu.be/q2ugLYZxHSI">
-    <img src="https://img.youtube.com/vi/q2ugLYZxHSI/maxresdefault.jpg" alt="LearnX demo — Java Concepts tutorial" width="720" />
-  </a>
-  <br/>
-  <em>Example output: <a href="https://youtu.be/q2ugLYZxHSI">Java Concepts tutorial</a> generated from <code>learning/javaConcept.md</code></em>
-</p>
+https://github.com/user-attachments/assets/44b0758c-3df4-4947-8ea7-edadc5db1690
+
 
 ```
 .md file → LLM curriculum → TTS audio → interactive player + Q&A
