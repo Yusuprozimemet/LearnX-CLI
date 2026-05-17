@@ -1,10 +1,19 @@
 # LearnX
 
 ![CI](https://github.com/Yusuprozimemet/LearnX-CLI/actions/workflows/ci.yml/badge.svg)
+[![Coverage](https://codecov.io/gh/Yusuprozimemet/LearnX-CLI/branch/main/graph/badge.svg)](https://codecov.io/gh/Yusuprozimemet/LearnX-CLI)
 [![PyPI](https://img.shields.io/pypi/v/learnx-cli.svg)](https://pypi.org/project/learnx-cli/)
 [![License](https://img.shields.io/pypi/l/learnx-cli.svg)](https://pypi.org/project/learnx-cli/)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
 [![DevLoop](https://img.shields.io/badge/DevLoop-agentic%20spec--driven-111827)](DEVLOOP.md)
+
+<p align="center">
+  <video controls width="720">
+    <source src="https://raw.githubusercontent.com/Yusuprozimemet/LearnX-CLI/main/demo/17.05.2026_13.25.26_REC.mp4" type="video/mp4" />
+  </video>
+  <br/>
+  <em>Local demo recording (MP4)</em>
+</p>
 
 Turn any Markdown document into an audio tutorial and MP4 video from a terminal shell.
 
@@ -21,11 +30,25 @@ Turn any Markdown document into an audio tutorial and MP4 video from a terminal 
                            → LLM segment plan → HTML slides → MP4 video
 ```
 
-<p align="center">
-  <img src="learnX.png" alt="LearnX CLI output" />
-</p>
+<details>
+  <summary>Pipeline diagram (Mermaid)</summary>
 
----
+```mermaid
+flowchart TD
+    A[Markdown file] --> B[Chunker\nStrategy A / B / C]
+    B --> C[LLM Summariser\nGroq · OpenRouter]
+    C --> D[LLM Curriculum\nTeachingUnit list]
+    D --> E[LLM Dialogue\nALEX + MAYA script]
+    E --> F[TTS Renderer\nMicrosoft Azure Neural]
+    F --> G[Audio Builder\nMP3 + timing.json]
+    G --> H[Interactive Player\npause · ask · replay]
+    G --> I[LLM Segment Planner\n10 visual types]
+    I --> J[Slide Renderer\nPlaywright + Jinja2]
+    J --> K[Video Assembler\nffmpeg → MP4 + SRT]
+```
+
+</details>
+
 
 ## Quick start
 

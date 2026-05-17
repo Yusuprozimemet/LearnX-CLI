@@ -1,4 +1,5 @@
 import sys
+from importlib.metadata import PackageNotFoundError, version
 
 from tutor.cli import theme
 from tutor.cli.commands import COMMAND_MAP, ShellContext
@@ -23,6 +24,14 @@ def _build_prompt(ctx: ShellContext) -> str:
 
 
 def run_shell() -> None:
+    if "--version" in sys.argv[1:] or "-V" in sys.argv[1:]:
+        try:
+            v = version("learnx-cli")
+        except PackageNotFoundError:
+            v = "0.3.0"
+        print(f"learnx-cli {v}")
+        return
+
     _setup_utf8()
     _prime_ffmpeg()
     print_welcome()
